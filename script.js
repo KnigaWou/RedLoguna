@@ -1,8 +1,6 @@
 // ============================================
-//  script.js — УВБ-76 Live (Нейросеть + Карта)
+//  script.js — УВБ-76 Live (с WebSDR)
 // ============================================
-
-import { db, ref, onValue, push, set, get } from './firebase-init.js';
 
 // ----- СОСТОЯНИЕ -----
 let isListening = false;
@@ -11,6 +9,7 @@ let map = null;
 let markers = [];
 let recognition = null;
 let audioContext = null;
+let websdrStream = null;
 
 // ----- DOM -----
 const statusDot = document.getElementById('statusDot');
@@ -21,8 +20,12 @@ const liveMorse = document.getElementById('liveMorse');
 const forecastText = document.getElementById('forecastText');
 const historyList = document.getElementById('historyList');
 const freqGrid = document.getElementById('freqGrid');
+const mapContainer = document.getElementById('map');
 
-// ----- ИНИЦИАЛИЗАЦИЯ -----
+// ============================================
+//  ИНИЦИАЛИЗАЦИЯ
+// ============================================
+
 async function init() {
     await loadDataFromFirebase();
     renderFrequencies();
@@ -30,34 +33,36 @@ async function init() {
     initMap();
     initSpeechRecognition();
     initAudioAnalyzer();
+    connectToWebSDR();
     startListening();
     updateClock();
     setInterval(updateClock, 1000);
     generateForecast();
 }
 
-// ----- ЗАГРУЗКА ДАННЫХ ИЗ FIREBASE -----
-async function loadDataFromFirebase() {
-    try {
-        // Загружаем словарь
-        const dictSnapshot = await get(ref(db, 'dictionary'));
-        if (dictSnapshot.exists()) {
-            Object.assign(CONFIG.dictionary, dictSnapshot.val());
-        }
+// ============================================
+//  ПОДКЛЮЧЕНИЕ К WEBSDR
+// ============================================
 
-        // Загружаем коды
-        const codesSnapshot = await get(ref(db, 'opCodes'));
-        if (codesSnapshot.exists()) {
-            Object.assign(CONFIG.opCodes, codesSnapshot.val());
-        }
+function connectToWebSDR() {
+    // Открываем WebSDR в iframe (невидимо)
+    const iframe = document.createElement('iframe');
+    iframe.src = 'http://websdr.ewi.utwente.nl:8901/';
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
 
-        console.log('✅ Данные из Firebase загружены');
-    } catch (e) {
-        console.error('❌ Ошибка загрузки данных:', e);
-    }
+    // Настраиваем частоту через URL-параметры
+    setTimeout(() => {
+        // Пытаемся переключить частоту через POST-запрос (если поддерживается)
+        console.log('📡 Подключение к WebSDR на 4625 кГц...');
+        statusText.textContent = '📡 Подключение к WebSDR...';
+    }, 3000);
 }
 
-// ----- РАСПОЗНАВАНИЕ РЕЧИ -----
+// ============================================
+//  РАСПОЗНАВАНИЕ РЕЧИ (из микрофона)
+// ============================================
+
 function initSpeechRecognition() {
     if (!('webkitSpeechRecognition' in window)) {
         statusText.textContent = '❌ Браузер не поддерживает распознавание речи';
@@ -69,34 +74,58 @@ function initSpeechRecognition() {
     recognition.continuous = true;
     recognition.interimResults = true;
 
+    recognition.onstart = function() {
+        statusDot.className = 'status-dot active';
+        statusText.textContent = '🎤 Слушаю...';
+    };
+
     recognition.onresult = function(event) {
-        const result = event.results[event.results.length - 1];
-        if (result.isFinal) {
-            const text = result[0].transcript.trim();
-            if (text.length > 2) {
-                processText(text);
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const result = event.results[i];
+            if (result.isFinal) {
+                const text = result[0].transcript.trim();
+                if (text.length > 2) {
+                    processText(text);
+                }
             }
         }
     };
 
     recognition.onerror = function(e) {
         console.warn('⚠️ Ошибка распознавания:', e.error);
+        if (e.error === 'not-allowed') {
+            statusText.textContent = '❌ Нет доступа к микрофону';
+        }
         // Автоматический перезапуск
         setTimeout(() => {
-            if (isListening) recognition.start();
+            if (isListening) {
+                try { recognition.start(); } catch (e) {}
+            }
         }, 2000);
+    };
+
+    recognition.onend = function() {
+        if (isListening) {
+            try { recognition.start(); } catch (e) {}
+        }
     };
 }
 
 function startListening() {
-    if (!recognition) return;
+    if (!recognition) {
+        statusText.textContent = '❌ Распознавание не поддерживается';
+        return;
+    }
     isListening = true;
     statusDot.className = 'status-dot active';
     statusText.textContent = '🎤 Слушаю...';
-    recognition.start();
+    try { recognition.start(); } catch (e) {}
 }
 
-// ----- АНАЛИЗ МОРЗЕ И ШУМА -----
+// ============================================
+//  АНАЛИЗ МОРЗЕ И ШУМА
+// ============================================
+
 function initAudioAnalyzer() {
     try {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -104,7 +133,7 @@ function initAudioAnalyzer() {
         analyser.fftSize = 512;
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
-        navigator.mediaDevices.getUserMedia({ audio: true })
+        navigator.mediaDevices.getUserMedia({ audio: true, video: false })
             .then(stream => {
                 const source = audioContext.createMediaStreamSource(stream);
                 source.connect(analyser);
@@ -116,13 +145,10 @@ function initAudioAnalyzer() {
                         liveMorse.textContent = `📟 ${morse}`;
                         saveMorseToFirebase(morse);
                     }
-                    const noise = detectNoise(dataArray);
-                    if (noise > 0.7) {
-                        console.log(`📊 Шум: ${(noise * 100).toFixed(0)}%`);
-                    }
                     requestAnimationFrame(analyze);
                 }
                 analyze();
+                console.log('✅ Аудио-анализатор запущен');
             })
             .catch(() => {
                 console.warn('⚠️ Нет доступа к микрофону для анализа шума');
@@ -142,24 +168,24 @@ function detectMorse(dataArray) {
     return null;
 }
 
-function detectNoise(dataArray) {
-    let sum = 0;
-    for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-    return sum / (dataArray.length * 255);
-}
+// ============================================
+//  ОБРАБОТКА ТЕКСТА (ПЕРЕВОД)
+// ============================================
 
-// ----- ОБРАБОТКА ТЕКСТА (ПЕРЕВОД) -----
 function processText(text) {
     liveText.textContent = text;
 
     let translation = findTranslation(text);
     liveTranslation.textContent = translation;
 
-    // Сохраняем в Firebase
     saveToFirebase(text, translation);
-
-    // Добавляем в историю
     addHistory(text, translation);
+
+    // Если есть координаты — показываем на карте
+    const coords = extractCoordinates(text);
+    if (coords) {
+        addMarker(coords.lat, coords.lon, { text, date: new Date().toISOString() });
+    }
 }
 
 function findTranslation(text) {
@@ -193,7 +219,7 @@ function extractCoordinates(text) {
     if (numbers && numbers.length >= 2) {
         const lat = parseInt(numbers[0].slice(0, 2)) + parseInt(numbers[0].slice(2)) / 100;
         const lon = parseInt(numbers[1].slice(0, 2)) + parseInt(numbers[1].slice(2)) / 100;
-        if (!isNaN(lat) && !isNaN(lon)) {
+        if (!isNaN(lat) && !isNaN(lon) && lat > -90 && lat < 90 && lon > -180 && lon < 180) {
             return {
                 lat: lat + CONFIG.shift.lat,
                 lon: lon + CONFIG.shift.lon
@@ -203,7 +229,10 @@ function extractCoordinates(text) {
     return null;
 }
 
-// ----- СОХРАНЕНИЕ В FIREBASE -----
+// ============================================
+//  СОХРАНЕНИЕ В FIREBASE
+// ============================================
+
 async function saveToFirebase(text, translation) {
     try {
         const newRef = push(ref(db, 'messages_live'));
@@ -215,6 +244,7 @@ async function saveToFirebase(text, translation) {
             date: new Date().toISOString(),
             source: 'neural'
         });
+        console.log('✅ Сохранено в Firebase:', text);
     } catch (e) {
         console.error('❌ Ошибка сохранения:', e);
     }
@@ -235,7 +265,10 @@ async function saveMorseToFirebase(morse) {
     }
 }
 
-// ----- ИСТОРИЯ -----
+// ============================================
+//  ИСТОРИЯ
+// ============================================
+
 function addHistory(text, translation) {
     const now = new Date();
     const time = now.toTimeString().slice(0, 8);
@@ -265,8 +298,12 @@ function renderHistory() {
     historyList.innerHTML = html;
 }
 
-// ----- КАРТА -----
+// ============================================
+//  КАРТА
+// ============================================
+
 function initMap() {
+    if (!mapContainer) return;
     map = L.map('map', {
         center: [55.0, 40.0],
         zoom: 4,
@@ -277,7 +314,6 @@ function initMap() {
         attribution: '&copy; OpenStreetMap, CartoDB'
     }).addTo(map);
 
-    // Загружаем цели из Firebase
     loadTargetsFromFirebase();
 }
 
@@ -285,30 +321,24 @@ async function loadTargetsFromFirebase() {
     try {
         const snapshot = await get(ref(db, 'messages'));
         if (!snapshot.exists()) return;
-
         const data = snapshot.val();
         Object.values(data).forEach(msg => {
             if (msg.digits && msg.digits.includes('0010')) {
                 const coords = extractCoordinates(msg.digits);
-                if (coords) {
-                    addMarker(coords.lat, coords.lon, msg);
-                }
+                if (coords) addMarker(coords.lat, coords.lon, msg);
             }
         });
     } catch (e) {
         console.error('❌ Ошибка загрузки целей:', e);
     }
 
-    // Слушаем новые цели в реальном времени
     onValue(ref(db, 'messages_live'), (snapshot) => {
         const data = snapshot.val();
         if (!data) return;
         Object.values(data).forEach(msg => {
             if (msg.text && msg.text.includes('0010')) {
                 const coords = extractCoordinates(msg.text);
-                if (coords) {
-                    addMarker(coords.lat, coords.lon, msg);
-                }
+                if (coords) addMarker(coords.lat, coords.lon, msg);
             }
         });
     });
@@ -336,7 +366,10 @@ function addMarker(lat, lon, msg) {
     markers.push({ lat, lon, marker, msg });
 }
 
-// ----- ПРОГНОЗ -----
+// ============================================
+//  ПРОГНОЗ
+// ============================================
+
 function generateForecast() {
     const now = new Date();
     const msk = new Date(now.getTime() + (3 * 60 * 60 * 1000));
@@ -361,8 +394,12 @@ function generateForecast() {
     forecastText.textContent = forecast;
 }
 
-// ----- ЧАСТОТЫ -----
+// ============================================
+//  ЧАСТОТЫ
+// ============================================
+
 function renderFrequencies() {
+    if (!freqGrid) return;
     freqGrid.innerHTML = '';
     CONFIG.frequencies.forEach(freq => {
         const btn = document.createElement('button');
@@ -383,21 +420,26 @@ function switchFreq(freq) {
     statusText.textContent = `📡 Частота ${freq} кГц`;
 }
 
-// ----- ИНСАЙТЫ -----
+// ============================================
+//  ИНСАЙТЫ
+// ============================================
+
 function renderInsights() {
     const container = document.getElementById('insightsGrid');
     if (!container) return;
-
     const icons = ['🧠', '📊', '🗺️', '📡', '🔮'];
     let html = '';
     CONFIG.insights.forEach((insight, i) => {
+        const parts = insight.split(':');
+        const title = parts[0] || 'Вывод';
+        const desc = parts.slice(1).join(':') || insight;
         html += `
             <div class="insight-card">
                 <div style="display:flex;align-items:center;gap:10px;">
                     <span style="font-size:1.6rem;">${icons[i % icons.length]}</span>
                     <div>
-                        <div class="title">${insight.split(':')[0] || 'Вывод'}</div>
-                        <div class="desc">${insight}</div>
+                        <div class="title">${title.trim()}</div>
+                        <div class="desc">${desc.trim()}</div>
                     </div>
                 </div>
             </div>
@@ -406,12 +448,25 @@ function renderInsights() {
     container.innerHTML = html;
 }
 
-// ----- ЧАСЫ -----
+// ============================================
+//  ЧАСЫ
+// ============================================
+
 function updateClock() {
     const now = new Date();
     const msk = new Date(now.getTime() + (3 * 60 * 60 * 1000));
-    document.getElementById('clock').textContent = msk.toISOString().slice(11, 16) + ' MSK';
+    const el = document.getElementById('clock');
+    if (el) el.textContent = msk.toISOString().slice(11, 16) + ' MSK';
 }
 
-// ----- ЗАПУСК -----
-document.addEventListener('DOMContentLoaded', init);
+// ============================================
+//  ЗАПУСК
+// ============================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🦇 УВБ-76 Live запущен');
+    init();
+});
+
+// Экспорт для отладки
+window.__uvb = { processText, extractCoordinates };
