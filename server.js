@@ -1,26 +1,57 @@
 // ============================================
-//  server.js — УВБ-76 Сервер
-//  Слушает WebSDR, распознаёт голос, переводит
+// server.js — УВБ-76 Сервер (авто-загрузка модели)
 // ============================================
 
 const WebSocket = require('ws');
 const vosk = require('vosk');
 const fs = require('fs');
 const admin = require('firebase-admin');
+const https = require('https');
+const unzipper = require('unzipper');
+const path = require('path');
 
-// ----- ПУТЬ К МОДЕЛИ (ТВОЙ ТЕЛЕФОН) -----
-const MODEL_PATH = '/storage/emulated/0/Download/vosk-model';
+// ----- ПУТЬ К МОДЕЛИ -----
+const MODEL_DIR = './vosk-model';
+const MODEL_ZIP = 'vosk-model-small-ru-0.22.zip';
+const MODEL_URL = 'https://alphacephei.com/vosk/models/' + MODEL_ZIP;
 
-// ----- ПРОВЕРКА МОДЕЛИ -----
-if (!fs.existsSync(MODEL_PATH)) {
-    console.error('❌ Модель не найдена по пути:', MODEL_PATH);
-    console.log('📥 Убедись, что папка vosk-model лежит в /Download');
-    process.exit(1);
+// ----- ФУНКЦИЯ СКАЧИВАНИЯ МОДЕЛИ -----
+function downloadModel() {
+    return new Promise((resolve, reject) => {
+        console.log('📥 Скачиваю модель Vosk (350 МБ)...');
+        const file = fs.createWriteStream(MODEL_ZIP);
+        https.get(MODEL_URL, (response) => {
+            response.pipe(file);
+            file.on('finish', () => {
+                file.close();
+                console.log('✅ Модель скачана, распаковываю...');
+                fs.createReadStream(MODEL_ZIP)
+                    .pipe(unzipper.Extract({ path: './' }))
+                    .on('close', () => {
+                        console.log('✅ Модель распакована');
+                        // Переименовываем папку
+                        if (fs.existsSync('vosk-model-small-ru-0.22')) {
+                            fs.renameSync('vosk-model-small-ru-0.22', MODEL_DIR);
+                        }
+                        fs.unlinkSync(MODEL_ZIP);
+                        resolve();
+                    });
+            });
+        }).on('error', reject);
+    });
 }
 
-console.log('✅ Модель найдена:', MODEL_PATH);
+// ----- ПРОВЕРКА И ЗАГРУЗКА МОДЕЛИ -----
+async function initModel() {
+    if (!fs.existsSync(MODEL_DIR)) {
+        console.log('⚠️ Модель не найдена, скачиваю...');
+        await downloadModel();
+    }
+    console.log('✅ Модель готова:', MODEL_DIR);
+    return new vosk.Model(MODEL_DIR);
+}
 
-// ----- FIREBASE (ТВОЙ КОНФИГ) -----
+// ----- FIREBASE -----
 const firebaseConfig = {
     apiKey: "AIzaSyCxuDhEGBrTdd6rSQ42CtPicmU3Y6Y0ZUo",
     authDomain: "redloguna.firebaseapp.com",
@@ -35,16 +66,9 @@ admin.initializeApp({
     credential: admin.credential.cert(firebaseConfig),
     databaseURL: firebaseConfig.databaseURL
 });
-
 const db = admin.database();
 
-// ----- VOSK -----
-const model = new vosk.Model(MODEL_PATH);
-const recognizer = new vosk.Recognizer({ model: model, sampleRate: 16000 });
-
-console.log('🧠 Vosk загружен');
-
-// ----- ПЕРЕВОД -----
+// ----- СЛОВАРЬ -----
 const DICT = {
     "ОБЕЗЬЯНКА": "✅ Завершение операции",
     "МЕРЗЛЫЙ": "🛠️ Техпроверка",
@@ -71,10 +95,13 @@ function translate(text) {
 }
 
 // ----- WEBSDR -----
+let model = null;
+let recognizer = null;
 const WEBSDR_URL = 'wss://websdr.ewi.utwente.nl:8901/audio';
 let ws = null;
 
 function connectWebSDR() {
+    if (!recognizer) return;
     ws = new WebSocket(WEBSDR_URL);
     ws.on('open', () => console.log('✅ WebSDR подключен'));
     ws.on('message', (data) => {
@@ -108,5 +135,12 @@ function connectWebSDR() {
 }
 
 // ----- ЗАПУСК -----
-connectWebSDR();
-console.log('🦇 УВБ-76 Сервер запущен');
+async function start() {
+    model = await initModel();
+    recognizer = new vosk.Recognizer({ model: model, sampleRate: 16000 });
+    console.log('🧠 Vosk загружен');
+    connectWebSDR();
+    console.log('🦇 УВБ-76 Сервер запущен');
+}
+
+start();
