@@ -4,21 +4,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>УВБ-76 — Живой анализатор</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="style.css">
-    <link rel="icon" href="https://img.icons8.com/fluency/48/bat.png">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0a0e17; color: #c8d6e5; font-family: 'Segoe UI', monospace; padding: 16px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: rgba(16,24,40,0.85); border: 1px solid #1a2a4a; border-radius: 12px; margin-bottom: 16px; }
+        header h1 { font-size: 1.5rem; color: #58a6ff; }
+        header h1 small { font-size: 0.8rem; color: #8b949e; }
+        .clock { font-size: 1.1rem; color: #f0e6d0; letter-spacing: 2px; }
+        .status-bar { display: flex; gap: 20px; flex-wrap: wrap; padding: 10px 16px; background: rgba(16,24,40,0.6); border: 1px solid #1a2a4a; border-radius: 10px; margin-bottom: 16px; font-size: 0.9rem; }
+        .status-item { display: flex; align-items: center; gap: 8px; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #555; transition: 0.3s; }
+        .status-dot.active { background: #00ff88; box-shadow: 0 0 15px #00ff88; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .live-block { background: rgba(16,24,40,0.8); border: 1px solid #1a2a4a; border-radius: 12px; padding: 14px 18px; margin-bottom: 16px; }
+        .live-row { display: flex; gap: 12px; padding: 4px 0; font-size: 1rem; }
+        .live-row .label { color: #8b949e; min-width: 120px; }
+        .live-row .value { color: #f0e6d0; word-break: break-word; }
+        .live-row.translation .value { color: #58a6ff; font-weight: 600; }
+        .btn { background: #1f6feb; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 1rem; cursor: pointer; margin: 8px 0; }
+        .btn:hover { background: #58a6ff; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .footer { text-align: center; color: #3a4a6a; font-size: 0.7rem; padding: 12px 0; border-top: 1px solid #1a2a4a; margin-top: 16px; }
+        #log { margin-top: 10px; background: #161b22; padding: 10px; border-radius: 8px; font-size: 0.8rem; max-height: 150px; overflow-y: auto; color: #8b949e; }
+        #log .ok { color: #6bcb77; }
+        #log .err { color: #ff6b6b; }
+        #log .info { color: #ffd93d; }
+    </style>
 </head>
 <body>
 
 <div class="container">
 
-    <!-- ШАПКА -->
     <header>
         <h1>🦇 УВБ-76 <small>Живой анализатор</small></h1>
         <div class="clock" id="clock">--:-- MSK</div>
     </header>
 
-    <!-- СТАТУС -->
     <div class="status-bar">
         <div class="status-item">
             <span class="status-dot" id="statusDot"></span>
@@ -26,11 +48,17 @@
         </div>
         <div class="status-item">
             <span>📡</span>
-            <span>Частота: <strong id="currentFreq">4625</strong> кГц</span>
+            <span>Частота: <strong>4625</strong> кГц</span>
         </div>
     </div>
 
-    <!-- LIVE ПЕРЕВОД -->
+    <!-- WebSDR в iframe (невидимый, просто чтобы звук шёл) -->
+    <iframe 
+        id="websdrFrame"
+        src="http://websdr.ewi.utwente.nl:8901/?freq=4625.00&mode=usb&volume=50" 
+        style="width:1px;height:1px;border:none;position:absolute;left:-9999px;"
+    ></iframe>
+
     <div class="live-block">
         <div class="live-row">
             <span class="label">🔊 Что сказано:</span>
@@ -46,47 +74,245 @@
         </div>
     </div>
 
-    <!-- ПРОГНОЗ -->
-    <div class="stat-card" style="margin-bottom:16px;text-align:left;padding:12px 16px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-size:1.2rem;">🔮 Прогноз</span>
-            <button onclick="location.reload()" style="background:rgba(26,42,74,0.6);border:1px solid #1a2a4a;border-radius:20px;padding:4px 12px;color:#c8d6e5;cursor:pointer;font-family:inherit;font-size:0.7rem;">Обновить</button>
-        </div>
-        <div id="forecastText" style="color:#8b949e;font-size:0.9rem;margin-top:6px;">Загрузка...</div>
-    </div>
+    <button class="btn" id="startBtn">▶ Запустить прослушку</button>
+    <button class="btn" id="stopBtn" style="display:none;">⏹ Остановить</button>
 
-    <!-- КАРТА -->
-    <div id="map"></div>
-    <div id="mapDescription" style="padding:8px 12px;color:#8b949e;font-size:0.8rem;border-bottom:1px solid #1a2a4a;margin-bottom:12px;">
-        📍 Карта показывает цели, обнаруженные в сообщениях. Координаты скорректированы (+2°/+5°).
-    </div>
-
-    <!-- ЧАСТОТЫ -->
-    <div class="frequencies">
-        <h3>📡 Сеть частот</h3>
-        <div class="freq-grid" id="freqGrid"></div>
-    </div>
-
-    <!-- ИСТОРИЯ -->
-    <div class="history">
-        <h3>📋 Лента переводов</h3>
-        <div id="historyList">
-            <div style="color:#5a6a7a;padding:12px;">Нет перехватов</div>
-        </div>
-    </div>
-
-    <!-- ИНСАЙТЫ -->
-    <h2 style="color:#8b949e;font-weight:400;letter-spacing:2px;font-size:0.8rem;margin:16px 0 12px;">🧠 Неочевидные выводы</h2>
-    <div class="insights" id="insightsGrid"></div>
+    <div id="log">📋 Готов к работе. Нажмите «Запустить прослушку».</div>
 
     <div class="footer">
-        Данные в реальном времени. Нейросеть слушает 4625 кГц и переводит автоматически.
+        Сайт слушает 4625 кГц через WebSDR. Перевод в реальном времени.
     </div>
 
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="config.js"></script>
-<script type="module" src="script.js"></script>
+<script>
+    // ============================================
+    //  УВБ-76 Живой анализатор (ВСЁ В ОДНОМ)
+    //  Работает через WebSDR + микрофон
+    // ============================================
+
+    // ----- СОСТОЯНИЕ -----
+    let isListening = false;
+    let recognition = null;
+    let audioContext = null;
+
+    // ----- DOM -----
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const liveText = document.getElementById('liveText');
+    const liveTranslation = document.getElementById('liveTranslation');
+    const liveMorse = document.getElementById('liveMorse');
+    const logDiv = document.getElementById('log');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+
+    // ----- ЛОГ -----
+    function log(msg, type = 'info') {
+        const time = new Date().toTimeString().slice(0, 8);
+        const cls = type === 'ok' ? 'ok' : type === 'err' ? 'err' : 'info';
+        logDiv.innerHTML += `<div class="${cls}">[${time}] ${msg}</div>`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    // ----- СЛОВАРЬ (ПЕРЕВОД) -----
+    const DICT = {
+        "ОБЕЗЬЯНКА": { emoji: "✅", text: "Завершение операции" },
+        "МЕРЗЛЫЙ": { emoji: "🛠️", text: "Техпроверка" },
+        "ГОЛОСОК": { emoji: "🔊", text: "Активация сети" },
+        "ОКОНЧАНЬЕ": { emoji: "🔇", text: "Завершение сеанса" },
+        "НЕРЧИНСКИЙ": { emoji: "🚀", text: "РВСН" },
+        "СУПЕРМАТИЗМ": { emoji: "🎯", text: "Наведение" },
+        "ЛАТВИЯ": { emoji: "🌍", text: "Прибалтика" },
+        "КАВКАЗ": { emoji: "🌍", text: "Кавказ" },
+        "КИТАЙСКИЙ": { emoji: "🌍", text: "Китай" },
+        "0010": { emoji: "🎯", text: "Боевой приказ" },
+        "0104": { emoji: "📡", text: "Смена частоты" },
+        "0100": { emoji: "🔒", text: "Переход в резерв" },
+        "0808": { emoji: "🆔", text: "ID подразделения" }
+    };
+
+    // ----- ПЕРЕВОД -----
+    function translate(text) {
+        const words = text.split(/\s+/);
+        for (const word of words) {
+            const clean = word.replace(/[^а-яА-Я0-9]/g, '').toUpperCase();
+            if (DICT[clean]) {
+                return `${DICT[clean].emoji} ${DICT[clean].text}`;
+            }
+        }
+        if (text.includes('0010')) {
+            return '🎯 Боевой приказ (координаты)';
+        }
+        if (text.includes('0104')) {
+            const freq = text.match(/\b(\d{4})\b/);
+            if (freq) return `📡 Смена частоты → ${freq[1]} кГц`;
+            return '📡 Смена частоты';
+        }
+        return '📻 Неизвестно';
+    }
+
+    // ----- РАСПОЗНАВАНИЕ РЕЧИ -----
+    function initRecognition() {
+        if (!('webkitSpeechRecognition' in window)) {
+            log('❌ Браузер не поддерживает распознавание речи', 'err');
+            statusText.textContent = '❌ Не поддерживается';
+            return false;
+        }
+
+        recognition = new webkitSpeechRecognition();
+        recognition.lang = 'ru-RU';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onstart = function() {
+            statusDot.className = 'status-dot active';
+            statusText.textContent = '🎤 Слушаю...';
+            log('🎤 Распознавание запущено', 'ok');
+        };
+
+        recognition.onresult = function(event) {
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const result = event.results[i];
+                if (result.isFinal) {
+                    const text = result[0].transcript.trim();
+                    if (text.length > 2) {
+                        liveText.textContent = text;
+                        const translation = translate(text);
+                        liveTranslation.textContent = translation;
+                        log(`🎤 "${text}" → 📖 ${translation}`, 'info');
+                    }
+                } else {
+                    const text = result[0].transcript.trim();
+                    if (text.length > 2) {
+                        liveText.textContent = text + '...';
+                    }
+                }
+            }
+        };
+
+        recognition.onerror = function(e) {
+            log(`⚠️ Ошибка: ${e.error}`, 'err');
+            if (e.error === 'not-allowed') {
+                statusText.textContent = '❌ Нет доступа к микрофону';
+                log('❌ Разрешите доступ к микрофону в браузере', 'err');
+            }
+            // Автоперезапуск
+            setTimeout(() => {
+                if (isListening) {
+                    try { recognition.start(); } catch (e) {}
+                }
+            }, 2000);
+        };
+
+        recognition.onend = function() {
+            if (isListening) {
+                try { recognition.start(); } catch (e) {}
+            }
+        };
+
+        return true;
+    }
+
+    // ----- АНАЛИЗ МОРЗЕ (через шум) -----
+    function initMorseDetector() {
+        try {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const analyser = audioContext.createAnalyser();
+            analyser.fftSize = 512;
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+            navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+                .then(stream => {
+                    const source = audioContext.createMediaStreamSource(stream);
+                    source.connect(analyser);
+
+                    function analyze() {
+                        analyser.getByteFrequencyData(dataArray);
+                        let sum = 0;
+                        for (let i = 0; i < dataArray.length; i++) {
+                            const freq = i * (audioContext.sampleRate / 2) / dataArray.length;
+                            if (freq > 800 && freq < 1200) sum += dataArray[i];
+                        }
+                        if (sum > 5000) {
+                            liveMorse.textContent = '📟 Обнаружен тональный сигнал (возможно Морзе)';
+                        } else {
+                            liveMorse.textContent = '—';
+                        }
+                        requestAnimationFrame(analyze);
+                    }
+                    analyze();
+                    log('✅ Анализатор Морзе запущен', 'ok');
+                })
+                .catch(() => {
+                    log('⚠️ Нет доступа к микрофону для анализа Морзе', 'warn');
+                });
+        } catch (e) {
+            log('⚠️ Audio API не поддерживается', 'warn');
+        }
+    }
+
+    // ----- ЗАПУСК -----
+    function startListening() {
+        if (isListening) return;
+
+        log('🚀 Запуск прослушки...', 'info');
+
+        // 1. Проверяем WebSDR iframe
+        const iframe = document.getElementById('websdrFrame');
+        log('📡 WebSDR загружается...', 'info');
+
+        // 2. Инициализируем распознавание
+        const ok = initRecognition();
+        if (!ok) {
+            log('❌ Не удалось запустить распознавание', 'err');
+            return;
+        }
+
+        // 3. Запускаем Морзе-детектор
+        initMorseDetector();
+
+        // 4. Запускаем распознавание
+        isListening = true;
+        statusDot.className = 'status-dot active';
+        statusText.textContent = '🎤 Слушаю...';
+        try { recognition.start(); } catch (e) {}
+
+        startBtn.style.display = 'none';
+        stopBtn.style.display = 'inline-block';
+
+        log('✅ Прослушка запущена! Говорите в микрофон.', 'ok');
+        log('📡 Звук с WebSDR должен идти в микрофон.', 'info');
+    }
+
+    function stopListening() {
+        isListening = false;
+        if (recognition) {
+            try { recognition.stop(); } catch (e) {}
+        }
+        statusDot.className = 'status-dot';
+        statusText.textContent = 'Остановлено';
+        startBtn.style.display = 'inline-block';
+        stopBtn.style.display = 'none';
+        log('⏹ Прослушка остановлена', 'warn');
+    }
+
+    // ----- ЧАСЫ -----
+    function updateClock() {
+        const now = new Date();
+        const msk = new Date(now.getTime() + (3 * 60 * 60 * 1000));
+        document.getElementById('clock').textContent = msk.toISOString().slice(11, 16) + ' MSK';
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ----- КНОПКИ -----
+    startBtn.addEventListener('click', startListening);
+    stopBtn.addEventListener('click', stopListening);
+
+    log('📋 Готов. Нажмите «Запустить прослушку».', 'info');
+    log('📡 Убедитесь, что в другой вкладке открыт WebSDR на 4625 кГц.', 'info');
+    log('🔊 Направьте звук с WebSDR в микрофон.', 'info');
+</script>
+
 </body>
-                                                                       </html>
+            </html>
