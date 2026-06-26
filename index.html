@@ -3,501 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>УВБ-76 — Дашборд</title>
-    <!-- Подключаем стили карты -->
+    <title>УВБ-76 — Анализатор</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <style>
-        /* ===== ГЛОБАЛЬНЫЕ СТИЛИ ===== */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            background: #0b0e14;
-            color: #e0e6ed;
-            font-family: 'Segoe UI', 'Roboto', sans-serif;
-            padding: 20px;
-            line-height: 1.6;
-        }
-        .container {
-            max-width: 1300px;
-            margin: 0 auto;
-        }
-
-        /* ===== ШАПКА ===== */
-        header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            padding: 12px 0 20px;
-            border-bottom: 1px solid #232a36;
-            margin-bottom: 30px;
-        }
-        h1 {
-            font-size: 2.4rem;
-            font-weight: 300;
-            color: #7af0c0;
-            letter-spacing: 1px;
-        }
-        h1 small {
-            font-size: 0.9rem;
-            color: #7a8ba3;
-            display: block;
-            font-weight: 300;
-        }
-        .status-badge {
-            background: #1f6feb;
-            padding: 6px 16px;
-            border-radius: 30px;
-            font-size: 0.85rem;
-            font-weight: 500;
-            color: #fff;
-        }
-        .clock {
-            font-size: 1.1rem;
-            color: #b0c7e7;
-            font-weight: 300;
-            min-width: 120px;
-            text-align: right;
-        }
-
-        /* ===== КАРТОЧКИ ===== */
-        .card-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 18px;
-            margin-bottom: 30px;
-        }
-        .stat-card {
-            background: #151e2a;
-            border-radius: 14px;
-            padding: 18px 20px;
-            border: 1px solid #232a36;
-            transition: 0.2s;
-        }
-        .stat-card:hover {
-            border-color: #3a4a5e;
-        }
-        .stat-card .label {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            color: #7a8ba3;
-            letter-spacing: 0.5px;
-        }
-        .stat-card .value {
-            font-size: 2.2rem;
-            font-weight: 300;
-            color: #e0e6ed;
-            line-height: 1.2;
-        }
-        .stat-card .note {
-            font-size: 0.8rem;
-            color: #5a6a7a;
-            margin-top: 4px;
-        }
-
-        /* ===== ПРОГНОЗ ===== */
-        .forecast-card {
-            background: #151e2a;
-            border-radius: 14px;
-            padding: 18px 24px;
-            margin-bottom: 30px;
-            border-left: 6px solid #1f6feb;
-        }
-        .forecast-card .title {
-            font-weight: 600;
-            color: #b0c7e7;
-            font-size: 0.9rem;
-        }
-        .forecast-card .body {
-            font-size: 1.1rem;
-            padding: 6px 0 2px;
-        }
-
-        /* ===== КАРТА ===== */
-        #map {
-            height: 320px;
-            border-radius: 14px;
-            margin-bottom: 30px;
-            background: #0d141f;
-            border: 1px solid #232a36;
-        }
-
-        /* ===== ТАБЛИЦА ===== */
-        .table-wrap {
-            background: #151e2a;
-            border-radius: 14px;
-            padding: 10px 0 0 0;
-            border: 1px solid #232a36;
-            overflow-x: auto;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.85rem;
-        }
-        th {
-            text-align: left;
-            color: #7a8ba3;
-            font-weight: 400;
-            padding: 12px 14px;
-            border-bottom: 1px solid #232a36;
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        td {
-            padding: 10px 14px;
-            border-bottom: 1px solid #1a222e;
-            vertical-align: middle;
-        }
-        tr:hover td {
-            background: #1a222e;
-        }
-        .badge {
-            background: #1f6feb;
-            padding: 2px 10px;
-            border-radius: 30px;
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: #fff;
-            display: inline-block;
-        }
-        .badge-cyan {
-            background: #0e7c7c;
-        }
-        .badge-amber {
-            background: #b8860b;
-        }
-        .code {
-            font-family: 'Courier New', monospace;
-            color: #b0c7e7;
-            background: #0d141f;
-            padding: 2px 8px;
-            border-radius: 6px;
-            font-size: 0.8rem;
-        }
-        .word {
-            font-weight: 500;
-            color: #e0e6ed;
-        }
-
-        /* ===== ФУТЕР ===== */
-        .footer {
-            margin-top: 30px;
-            text-align: center;
-            color: #3a4a5e;
-            font-size: 0.75rem;
-            border-top: 1px solid #1a222e;
-            padding-top: 18px;
-        }
-
-        /* ===== АДАПТИВ ===== */
-        @media (max-width: 640px) {
-            header {
-                flex-direction: column;
-                align-items: start;
-                gap: 10px;
-            }
-            .clock {
-                text-align: left;
-                width: 100%;
-            }
-            .stat-card .value {
-                font-size: 1.6rem;
-            }
-            td,
-            th {
-                padding: 6px 8px;
-                font-size: 0.75rem;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
 
-        <!-- ===== ШАПКА ===== -->
         <header>
             <div>
                 <h1>УВБ-76 <small>Расшифровка сигналов • 2023–2026</small></h1>
             </div>
-            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
-                <span class="status-badge" id="status">🟢 Загрузка...</span>
-                <span class="clock" id="clock">--:--:--</span>
-            </div>
+            <div class="clock" id="clock">--:--:-- MSK</div>
         </header>
 
-        <!-- ===== СТАТИСТИКА ===== -->
-        <div class="card-grid" id="stats-grid">
-            <div class="stat-card">
+        <!-- Статистика -->
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="num" id="totalCount">0</div>
                 <div class="label">Всего сообщений</div>
-                <div class="value" id="total-msgs">---</div>
-                <div class="note">за 804 дня</div>
             </div>
-            <div class="stat-card">
-                <div class="label">Уникальных слов</div>
-                <div class="value" id="unique-words">---</div>
-                <div class="note">словарь</div>
+            <div class="stat-item">
+                <div class="num" id="todayCount">0</div>
+                <div class="label">Сегодня</div>
             </div>
-            <div class="stat-card">
-                <div class="label">Последнее обновление</div>
-                <div class="value" id="last-update" style="font-size:1.2rem;">---</div>
-                <div class="note">UTC+3</div>
+            <div class="stat-item">
+                <div class="num" id="lastDate">--</div>
+                <div class="label">Последнее</div>
             </div>
-            <div class="stat-card">
-                <div class="label">Активность сегодня</div>
-                <div class="value" id="today-activity">---</div>
-                <div class="note">сообщений</div>
+            <div class="stat-item">
+                <div class="num" id="dictSize">0</div>
+                <div class="label">Слов в словаре</div>
             </div>
         </div>
 
-        <!-- ===== ПРОГНОЗ ===== -->
-        <div class="forecast-card" id="forecast">
-            <div class="title">🔮 Прогноз активности</div>
-            <div class="body" id="forecast-text">Анализирую данные...</div>
+        <!-- Прогноз -->
+        <div class="forecast-box">
+            <div class="title">🔮 Прогноз</div>
+            <div class="text" id="forecastText">Загрузка...</div>
         </div>
 
-        <!-- ===== КАРТА ===== -->
+        <!-- Карта -->
         <div id="map"></div>
 
-        <!-- ===== ТАБЛИЦА ===== -->
+        <!-- Таблица переводов -->
         <div class="table-wrap">
             <table>
                 <thead>
                     <tr>
-                        <th>Дата</th>
-                        <th>Время</th>
-                        <th>Позывной</th>
-                        <th>Кодовое слово</th>
+                        <th>Когда</th>
+                        <th>Кто</th>
+                        <th>Перевод</th>
                         <th>Цифры</th>
-                        <th>Расшифровка</th>
                     </tr>
                 </thead>
-                <tbody id="messages-body">
-                    <tr><td colspan="6" style="text-align:center; color:#5a6a7a;">Загрузка данных...</td></tr>
+                <tbody id="messagesBody">
+                    <tr><td colspan="4" style="text-align:center;color:#5a6a7a;">Загрузка...</td></tr>
                 </tbody>
             </table>
         </div>
 
         <div class="footer">
-            Данные из открытых источников • Анализ выполнен в 2026 году • <span id="row-count">0</span> записей
+            Данные перехватов из открытых источников. Карта показывает реальные объекты.
         </div>
     </div>
 
-    <!-- Подключаем карту -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
-    </script>
-
-    <script>
-        // =======================================================
-        // 1. БАЗА ДАННЫХ (встроенная, 20 последних сообщений)
-        // =======================================================
-        const messages = [
-            { date: "2026-06-25", time: "19:01", callsign: "НЖТИ", word: "ОБЕЗЬЯНКА", digits: "3641 5048",
-            decoded: "✅ Завершение операции" },
-            { date: "2026-06-24", time: "17:10", callsign: "НЖТИ", word: "КЛЮВИК", digits: "5162 7289",
-            decoded: "🔍 Неизвестно" },
-            { date: "2026-06-24", time: "17:04", callsign: "ЦЖАП ЗМО9", word: "ФЛЮСОБОБ", digits: "0104 2087",
-                decoded: "📡 Смена частоты на 2087 кГц" },
-            { date: "2026-06-24", time: "16:49", callsign: "НЖТИ", word: "АМИДОМАЙН", digits: "0010 7943",
-            decoded: "🎯 Боевой приказ (ID 7943)" },
-            { date: "2026-05-21", time: "15:38", callsign: "НЖТИ", word: "АКРОФИ", digits: "0303 6994",
-                decoded: "🌍 Маршрут: старт (Индийский океан)" },
-            { date: "2026-05-21", time: "15:38", callsign: "НЖТИ", word: "РУБАХА", digits: "9148 0718",
-                decoded: "🌍 Маршрут: цель (Арктика)" },
-            { date: "2026-05-15", time: "11:22", callsign: "У352", word: "МЯЧОХЛЕБ", digits: "8679 8735",
-            decoded: "🔍 Неизвестно" },
-            { date: "2026-04-23", time: "15:14", callsign: "НЖТИ", word: "РОССОПИК", digits: "1368 0604",
-            decoded: "🔍 Неизвестно" },
-            { date: "2026-04-13", time: "16:02", callsign: "НЖТИ", word: "КИТАЙСКИЙ", digits: "8875 1328",
-            decoded: "🌍 Геополитический сигнал (Китай)" },
-            { date: "2026-03-12", time: "15:56", callsign: "НЖТИ", word: "КАВКАЗ", digits: "0104 4657",
-                decoded: "🌍 Геополитический сигнал + Смена частоты на 4657 кГц" },
-            { date: "2026-02-11", time: "16:41", callsign: "НЖТИ", word: "КАВКАЗ", digits: "0104 4657",
-                decoded: "🌍 Геополитический сигнал + Смена частоты на 4657 кГц" },
-            { date: "2026-02-11", time: "12:53", callsign: "НЖТИ", word: "СССР", digits: "8235 0802",
-            decoded: "🏛️ Исторический сигнал (возможно, ошибка)" },
-            { date: "2026-01-29", time: "15:03", callsign: "НЖТИ", word: "СТАРОВЕРЕЦ", digits: "5403 1602",
-            decoded: "🔍 Неизвестно" },
-            { date: "2025-12-10", time: "14:34", callsign: "НЖТИ", word: "ПОКАЯННЫЙ", digits: "8135 3102",
-            decoded: "🔍 Неизвестно" },
-            { date: "2025-11-17", time: "14:40", callsign: "НЖТИ", word: "ЛАТВИЯ", digits: "5894 4167",
-                decoded: "🌍 Геополитический сигнал (Прибалтика)" },
-            { date: "2025-07-10", time: "11:07", callsign: "НЖТИ", word: "ТАКСА", digits: "0216 5516",
-            decoded: "🔍 Неизвестно" },
-            { date: "2024-09-18", time: "13:37", callsign: "ЦЖАП", word: "ЗЛАКОБАК", digits: "0010 9160",
-                decoded: "🎯 Боевой приказ + смена частоты на 9160 кГц" },
-            { date: "2024-07-31", time: "16:34", callsign: "ЦЖАП РХ51 БХВС ТОД3", word: "НЕРЧИНСКИЙ",
-            digits: "0010 5422", decoded: "🚀 Ракетные войска (РВСН) + ID цели 5422" },
-            { date: "2023-07-06", time: "13:04", callsign: "НЖТИ", word: "ГОЛОСОК", digits: "8017 8154",
-            decoded: "🔊 Активация сети" },
-            { date: "2023-06-22", time: "11:13", callsign: "НЖТИ", word: "МЕРЗЛЫЙ", digits: "0808 2023",
-            decoded: "🛠️ Техническая проверка (ID 0808)" },
-        ];
-
-        // =======================================================
-        // 2. ЧАСЫ РЕАЛЬНОГО ВРЕМЕНИ
-        // =======================================================
-        function updateClock() {
-            const now = new Date();
-            const pad = n => String(n).padStart(2, '0');
-            document.getElementById('clock').textContent =
-                `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())} MSK`;
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
-
-        // =======================================================
-        // 3. СТАТИСТИКА
-        // =======================================================
-        function updateStats() {
-            const total = messages.length;
-            const uniqueWords = new Set(messages.map(m => m.word)).size;
-            const last = messages[0];
-            const today = new Date().toISOString().slice(0, 10);
-            const todayCount = messages.filter(m => m.date === today).length;
-
-            document.getElementById('total-msgs').textContent = total;
-            document.getElementById('unique-words').textContent = uniqueWords;
-            document.getElementById('last-update').textContent = last ? `${last.date} ${last.time}` : '---';
-            document.getElementById('today-activity').textContent = todayCount;
-            document.getElementById('row-count').textContent = total;
-        }
-
-        // =======================================================
-        // 4. ПРОГНОЗ (на основе дня недели и часа)
-        // =======================================================
-        function updateForecast() {
-            const now = new Date();
-            const day = now.getDay();
-            const hour = now.getHours();
-            let text = '';
-
-            // Аномалия: если сегодня четверг и время 12–16 — пик
-            if (day === 4 && hour >= 12 && hour <= 16) {
-                text = '🔥 СЕЙЧАС ПИК АКТИВНОСТИ! Ловите коды 0010 и 0104. Вероятность 15+ сообщений.';
-            } else if (day === 4) {
-                text = '⏳ Сегодня четверг — плановый день активности. Пик ожидается в 13:00 по МСК.';
-            } else if (day === 3) {
-                text = '⏳ Завтра четверг — готовьтесь к шквалу. Пик в 13:00 МСК.';
-            } else if (day === 5 || day === 6) {
-                text = '💤 Выходные. Активность низкая, но возможны технические проверки (МЕРЗЛЫЙ).';
-            } else {
-                text = '📅 Обычный день. Ждите активности в четверг. Сейчас тихо.';
-            }
-
-            // Добавляем сезонность
-            const month = now.getMonth();
-            if (month === 5 || month === 6 || month === 11) {
-                text += ' 📈 Сезонный пик (июнь, июль, декабрь) — возможны учения.';
-            }
-
-            document.getElementById('forecast-text').textContent = text;
-        }
-
-        // =======================================================
-        // 5. ТАБЛИЦА
-        // =======================================================
-        function renderTable() {
-            const tbody = document.getElementById('messages-body');
-            if (messages.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#5a6a7a;">Нет данных</td></tr>';
-                return;
-            }
-            let html = '';
-            messages.slice(0, 25).forEach(m => {
-                const badgeClass = m.decoded.includes('Боевой') ? 'badge-cyan' :
-                    m.decoded.includes('Смена частоты') ? 'badge-amber' : '';
-                html += `<tr>
-                    <td>${m.date}</td>
-                    <td>${m.time}</td>
-                    <td><span class="badge">${m.callsign}</span></td>
-                    <td class="word">${m.word}</td>
-                    <td><span class="code">${m.digits}</span></td>
-                    <td><span class="badge ${badgeClass}">${m.decoded}</span></td>
-                </tr>`;
-            });
-            tbody.innerHTML = html;
-        }
-
-        // =======================================================
-        // 6. КАРТА (безопасная инициализация)
-        // =======================================================
-        function initMap() {
-            const mapContainer = document.getElementById('map');
-            if (typeof L === 'undefined') {
-                mapContainer.innerHTML = '<div style="padding:40px;text-align:center;color:#5a6a7a;">⚠️ Библиотека карт не загружена. Проверьте интернет.</div>';
-                return;
-            }
-
-            try {
-                const map = L.map('map', {
-                    center: [60, 60],
-                    zoom: 3,
-                    zoomControl: true
-                });
-
-                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                    attribution: '&copy; OpenStreetMap & CartoDB',
-                    subdomains: 'abcd',
-                    maxZoom: 19
-                }).addTo(map);
-
-                // Маршрут 1: Тыва → Литва → Кавказ
-                const route1 = [
-                    [47.02, 97.13],
-                    [54.22, 24.02],
-                    [42.00, 45.00]
-                ];
-                L.polyline(route1, { color: '#58a6ff', weight: 3, dashArray: '6, 6' })
-                    .addTo(map)
-                    .bindPopup('Маршрут 1: Тыва → Литва → Кавказ');
-
-                // Маршрут 2: Индийский океан → Арктика (из АКРОФИ)
-                const route2 = [
-                    [5.03, 74.94],
-                    [93.48, 12.18],
-                    [99.15, 8.08]
-                ];
-                L.polyline(route2, { color: '#ff6b6b', weight: 3 })
-                    .addTo(map)
-                    .bindPopup('Маршрут 2: Индийский океан → Арктика');
-
-                // Точки интереса
-                const points = [
-                    { lat: 47.02, lng: 97.13, label: 'Тыва (цель)' },
-                    { lat: 54.22, lng: 24.02, label: 'Литва (НАТО)' },
-                    { lat: 42.00, lng: 45.00, label: 'Кавказ' },
-                    { lat: 93.48, lng: 12.18, label: 'Арктика (цель)' }
-                ];
-                points.forEach(p => {
-                    L.marker([p.lat, p.lng])
-                        .addTo(map)
-                        .bindPopup(`<b>${p.label}</b><br>${p.lat.toFixed(2)}, ${p.lng.toFixed(2)}`);
-                });
-
-                // Адаптация под размер контейнера
-                setTimeout(() => map.invalidateSize(), 300);
-
-            } catch (e) {
-                console.warn('Ошибка карты:', e);
-                mapContainer.innerHTML = '<div style="padding:40px;text-align:center;color:#5a6a7a;">⚠️ Не удалось загрузить карту.</div>';
-            }
-        }
-
-        // =======================================================
-        // 7. ЗАПУСК
-        // =======================================================
-        document.addEventListener('DOMContentLoaded', function() {
-            updateStats();
-            updateForecast();
-            renderTable();
-            initMap();
-            document.getElementById('status').textContent = '🟢 Онлайн • 2023–2026';
-        });
-    </script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
 </body>
     </html>
