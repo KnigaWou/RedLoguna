@@ -1,1 +1,46 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>УВБ-76 — Дашборд</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>УВБ-76</h1>
+            <p>Расшифровка радиосигналов • 2023–2026</p>
+            <p><span id="status">⏳ Загрузка...</span></p>
+        </header>
 
+        <!-- КАРТА МАРШРУТОВ -->
+        <section>
+            <h2>🗺️ Карта маршрутов</h2>
+            <div id="map" style="height:400px; border-radius:16px;"></div>
+        </section>
+
+        <!-- ПОСЛЕДНИЕ СООБЩЕНИЯ -->
+        <section>
+            <h2>📡 Последние перехваты</h2>
+            <div id="messages-table"></div>
+        </section>
+
+        <!-- СЛОВАРЬ -->
+        <section>
+            <h2>📖 Словарь расшифровки</h2>
+            <div id="dictionary"></div>
+        </section>
+
+        <!-- ПРОГНОЗ -->
+        <section>
+            <h2>🔮 Прогноз активности</h2>
+            <div id="forecast"></div>
+        </section>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="script.js"></script>
+</body>
+  </html>
