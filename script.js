@@ -1,5 +1,5 @@
 // ============================================
-//  script.js — Умный анализатор УВБ-76
+//  script.js — Умный анализатор УВБ-76 (гибрид)
 // ============================================
 
 let messages = [];
@@ -9,28 +9,56 @@ let currentFreq = 4625;
 let volume = 70;
 let noiseReduction = 50;
 
-// ----- ЗАГРУЗКА CSV -----
-async function loadCSV() {
+// ----- ЗАГРУЗКА CSV ИЛИ ВСТРОЕННЫХ ДАННЫХ -----
+async function loadData() {
+    let loaded = false;
+
+    // Пытаемся загрузить CSV
     try {
         const response = await fetch('data/messages.csv');
-        const text = await response.text();
-        const lines = text.split('\n').filter(line => line.trim());
-        const headers = lines[0].split(',').map(h => h.trim());
-
-        messages = lines.slice(1).map(line => {
-            const values = line.split(',').map(v => v.trim());
-            const obj = {};
-            headers.forEach((h, i) => obj[h] = values[i] || '');
-            return obj;
-        });
-
-        console.log(`✅ Загружено ${messages.length} сообщений`);
-        renderAll();
+        if (response.ok) {
+            const text = await response.text();
+            const lines = text.split('\n').filter(line => line.trim());
+            if (lines.length > 1) {
+                const headers = lines[0].split(',').map(h => h.trim());
+                messages = lines.slice(1).map(line => {
+                    const values = line.split(',').map(v => v.trim());
+                    const obj = {};
+                    headers.forEach((h, i) => obj[h] = values[i] || '');
+                    return obj;
+                });
+                console.log(`✅ Загружено ${messages.length} сообщений из CSV`);
+                loaded = true;
+            }
+        }
     } catch (e) {
-        console.error('❌ Ошибка:', e);
-        document.getElementById('messagesBody').innerHTML =
-            '<tr><td colspan="4" style="text-align:center;color:#ff4444;">Ошибка загрузки</td></tr>';
+        console.log('CSV не найден, использую встроенные данные');
     }
+
+    // Если CSV не загрузился — берём из CONFIG
+    if (!loaded && CONFIG.messages && CONFIG.messages.length) {
+        messages = CONFIG.messages.map(m => ({
+            date: m.date,
+            time: m.time,
+            callsign: m.callsign,
+            group: m.code || '',
+            word_1: m.word,
+            digits_1: m.digits,
+            digits_2: '',
+            digits_3: '',
+            digits_4: '',
+        }));
+        console.log(`✅ Загружено ${messages.length} сообщений из CONFIG`);
+    }
+
+    if (!messages.length) {
+        console.warn('⚠️ Нет данных для отображения');
+        document.getElementById('messagesBody').innerHTML =
+            '<tr><td colspan="4" style="text-align:center;color:#5a6a7a;">Нет данных. Загрузите CSV или добавьте сообщения в CONFIG.messages</td></tr>';
+        return;
+    }
+
+    renderAll();
 }
 
 // ----- РЕНДЕРИНГ ВСЕГО -----
@@ -65,7 +93,7 @@ function updateStats() {
     document.getElementById('dictSize').textContent = dictSize;
 }
 
-// ----- ВСЕ СООБЩЕНИЯ (полная таблица) -----
+// ----- ВСЕ СООБЩЕНИЯ -----
 function renderAllMessages() {
     const tbody = document.getElementById('messagesBody');
 
@@ -74,8 +102,7 @@ function renderAllMessages() {
         return;
     }
 
-    // Показываем все сообщения (расшифрованные)
-    const all = messages.slice().reverse();
+    const all = messages.slice().reverse().slice(0, 100);
 
     let html = '';
     all.forEach(msg => {
@@ -97,7 +124,7 @@ function renderAllMessages() {
     tbody.innerHTML = html;
 }
 
-// ----- ПОСЛЕДНИЕ 2 ДНЯ (расшифровка под картой) -----
+// ----- ПОСЛЕДНИЕ 2 ДНЯ -----
 function renderLastTwoDays() {
     const container = document.getElementById('lastTwoDays');
     if (!container) return;
@@ -117,7 +144,6 @@ function renderLastTwoDays() {
         return;
     }
 
-    // Группируем по дням
     const groups = {};
     recent.forEach(msg => {
         if (!groups[msg.date]) groups[msg.date] = [];
@@ -159,36 +185,27 @@ function renderLastTwoDays() {
     container.innerHTML = html;
 }
 
-// ----- ФУНКЦИЯ ПЕРЕВОДА (автоматическая) -----
+// ----- ПЕРЕВОД СООБЩЕНИЯ -----
 function translateMessage(msg) {
     const word = msg.word_1 || '';
 
-    // Проверяем коды операций
     if (CONFIG.opCodes[word]) {
         return `${CONFIG.opCodes[word].emoji} ${CONFIG.opCodes[word].text}`;
     }
 
-    // Проверяем словарь
     if (CONFIG.dict[word]) {
         return `${CONFIG.dict[word].emoji} ${CONFIG.dict[word].text}`;
     }
 
-    // Если есть код 0010 в digits — боевой приказ
     const digits = [msg.digits_1, msg.digits_2, msg.digits_3, msg.digits_4].join(' ');
-    if (digits.includes('0010')) {
-        return '🎯 Боевой приказ (координаты)';
-    }
-    if (digits.includes('0104')) {
-        return '📡 Смена частоты';
-    }
+    if (digits.includes('0010')) return '🎯 Боевой приказ (координаты)';
+    if (digits.includes('0104')) return '📡 Смена частоты';
 
-    // Неизвестное слово
     return `📻 ${word || 'Неизвестно'}`;
 }
 
-// ----- ФУНКЦИЯ РАСШИФРОВКИ КООРДИНАТ -----
+// ----- РАСШИФРОВКА КООРДИНАТ -----
 function decodeCoordinates(digits) {
-    // Ищем 4-значные числа
     const parts = digits.split(/\s+/);
     for (let i = 0; i < parts.length - 1; i++) {
         if (parts[i].length === 4 && parts[i+1].length === 4) {
@@ -208,7 +225,7 @@ function decodeCoordinates(digits) {
     return null;
 }
 
-// ----- ЧАСТОТЫ С КНОПКАМИ И ПОЛЗУНКАМИ -----
+// ----- ЧАСТОТЫ -----
 function renderFrequencies() {
     const container = document.getElementById('freqGrid');
     if (!container) return;
@@ -226,7 +243,6 @@ function renderFrequencies() {
 
     container.innerHTML = html;
 
-    // Клик по частоте
     container.querySelectorAll('.freq-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const freq = parseInt(this.dataset.freq);
@@ -234,7 +250,6 @@ function renderFrequencies() {
         });
     });
 
-    // Ползунки
     setupSliders();
 }
 
@@ -246,7 +261,6 @@ function toggleFreq(freq) {
             const isActive = btn.dataset.active === 'true';
             btn.dataset.active = !isActive;
             btn.classList.toggle('active');
-            // Обновляем в CONFIG
             const cfg = CONFIG.frequencies.find(f => f.freq === freq);
             if (cfg) cfg.active = !isActive;
         } else {
@@ -262,7 +276,6 @@ function toggleFreq(freq) {
 }
 
 function setupSliders() {
-    // Громкость
     const volumeSlider = document.getElementById('volumeSlider');
     const volumeValue = document.getElementById('volumeValue');
     if (volumeSlider) {
@@ -272,7 +285,6 @@ function setupSliders() {
         });
     }
 
-    // Шумодав
     const noiseSlider = document.getElementById('noiseSlider');
     const noiseValue = document.getElementById('noiseValue');
     if (noiseSlider) {
@@ -295,14 +307,14 @@ function updateFreqInfo(freq) {
                 <span style="font-size:1.8rem;color:#58a6ff;">📡</span>
                 <div>
                     <div style="font-size:1.2rem;font-weight:600;color:#f0e6d0;">${f.freq} кГц</div>
-                    <div style="color:#8b949e;font-size:0.85rem;">${f.name} — ${f.desc || ''} <span style="color:${f.active ? '#00ff88' : '#ff6666'};">${status}</span></div>
+                    <div style="color:#8b949e;font-size:0.85rem;">${f.name} — <span style="color:${f.active ? '#00ff88' : '#ff6666'};">${status}</span></div>
                 </div>
             </div>
         `;
     }
 }
 
-// ----- ПРОГНОЗ (сегодня, завтра, неделя) -----
+// ----- ПРОГНОЗ -----
 function renderForecast() {
     const today = new Date();
     const tomorrow = new Date(today);
@@ -350,21 +362,15 @@ function calculateDayProbability(date) {
     const month = date.getMonth() + 1;
     const hour = date.getHours();
 
-    // Базовая вероятность от дня недели
     let prob = CONFIG.forecastWeights[day]?.weight || 0.4;
-
-    // Сезонный бонус
     const seasonal = CONFIG.seasonalBoost[month] || 1.0;
     prob = prob * seasonal;
 
-    // Часовой фактор (пик 13:00)
     if (hour >= 12 && hour <= 15) {
         prob = prob * 1.3;
     }
 
-    // Ограничиваем 5-95%
     prob = Math.min(95, Math.max(5, Math.round(prob * 100)));
-
     return prob;
 }
 
@@ -410,7 +416,6 @@ function renderMap() {
         attribution: '&copy; OpenStreetMap, CartoDB'
     }).addTo(map);
 
-    // Добавляем цели с координатами
     let added = 0;
     messages.forEach(msg => {
         const digits = [msg.digits_1, msg.digits_2, msg.digits_3, msg.digits_4]
@@ -427,7 +432,6 @@ function renderMap() {
         }
     });
 
-    // Если нет точек — тестовые
     if (added === 0) {
         const testPoints = [
             [50.47, 95.27, 'Тыва (РЛС)', 'Из перехвата 15.06.2023'],
@@ -442,10 +446,7 @@ function renderMap() {
         });
     }
 
-    // Обновляем описание
     updateMapDescription();
-
-    // Перерисовываем через секунду для корректного размера
     setTimeout(() => map.invalidateSize(), 300);
 }
 
@@ -487,8 +488,7 @@ function updateMapDescription() {
         return diff < 2;
     }).length;
 
-    let text = CONFIG.mapDescription.default || '';
-    text += ` Всего целей на карте: ${total}. Активных за последние 2 дня: ${active}.`;
+    let text = `📍 Всего целей на карте: ${total}. Активных за последние 2 дня: ${active}.`;
 
     if (active > 0) {
         text += ' 🔴 Обнаружена активность в последние 48 часов.';
@@ -507,13 +507,16 @@ function renderInsights() {
     const icons = ['🧠', '📊', '🗺️', '📡', '🔮'];
     let html = '';
     CONFIG.insights.forEach((insight, i) => {
+        const parts = insight.split(':');
+        const title = parts[0] || 'Вывод';
+        const desc = insight;
         html += `
             <div class="insight-card">
                 <div style="display:flex;align-items:center;gap:10px;">
                     <span style="font-size:1.6rem;">${icons[i % icons.length]}</span>
                     <div>
-                        <div class="title">${insight.split(':')[0] || 'Вывод'}</div>
-                        <div class="desc">${insight}</div>
+                        <div class="title">${title}</div>
+                        <div class="desc">${desc}</div>
                     </div>
                 </div>
             </div>
@@ -552,11 +555,10 @@ function updateClock() {
     setTimeout(updateClock, 1000);
 }
 
-// ----- ИНИЦИАЛИЗАЦИЯ -----
+// ----- ЗАПУСК -----
 document.addEventListener('DOMContentLoaded', function() {
-    loadCSV();
+    loadData();
 
-    // Кнопка обновления прогноза
     const refreshBtn = document.getElementById('refreshForecast');
     if (refreshBtn) {
         refreshBtn.addEventListener('click', renderForecast);
