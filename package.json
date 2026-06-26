@@ -1,15 +1,14 @@
 {
-  "name": "uvb-live-server",
+  "name": "uvb-server",
   "version": "1.0.0",
-  "description": "Сервер УВБ-76 с авто-загрузкой модели",
+  "description": "УВБ-76 сервер",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "firebase-admin": "^11.10.0",
-    "vosk": "^0.3.39",
     "ws": "^8.13.0",
-    "unzipper": "^0.10.14"
+    "firebase-admin": "^11.10.0",
+    "node-fetch": "^2.6.7"
   }
 }
