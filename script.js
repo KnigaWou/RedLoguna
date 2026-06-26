@@ -1,72 +1,346 @@
 // ============================================
-//  data.js — База данных и Словарь
+//  script.js — Основная логика анализатора
 // ============================================
 
-// СЛОВАРЬ (коды → человеческий язык)
-const DICT = {
-    // Коды операций
-    '0010': { emoji: '🎯', text: 'Боевой приказ', desc: 'Следуют координаты цели' },
-    '0104': { emoji: '📡', text: 'Смена частоты', desc: 'Указывается новая частота в кГц' },
-    '0100': { emoji: '🔒', text: 'Переход в резерв', desc: 'Отбой или смена ключей' },
-    '0013': { emoji: '📡', text: 'Смена частоты', desc: 'Переход на станцию "Капля" или "Скрипучее колесо"' },
-    '0808': { emoji: '🆔', text: 'ID подразделения', desc: 'Идентификатор воинской части' },
-    
-    // Ключевые слова-действия
-    'СВОДНИК': { emoji: '🔄', text: 'Ретрансляция', desc: 'Повтор команды для полевых частей' },
-    'ОБЕЗЬЯНКА': { emoji: '✅', text: 'Завершение операции', desc: 'Сигнал «Отбой»' },
-    'МЕРЗЛЫЙ': { emoji: '🛠️', text: 'Техпроверка', desc: 'Проверка канала связи' },
-    'ДОКОБЛЕФ': { emoji: '🛠️', text: 'Техпроверка', desc: 'Проверка канала связи' },
-    'ОСТАВЛЕНИЕ': { emoji: '✅', text: 'Подтверждение', desc: 'Приказ выполнен' },
-    'ГОЛОСОК': { emoji: '🔊', text: 'Активация сети', desc: 'Начало сеанса связи' },
-    'ОКОНЧАНЬЕ': { emoji: '🔇', text: 'Завершение сеанса', desc: 'Конец связи' },
-    'ПРИБЛИЖЕНИЕ': { emoji: '⚠️', text: 'Предупреждение', desc: 'Скоро начнётся операция' },
-    'ЗАГРЕБ': { emoji: '🔄', text: 'Отмена', desc: 'Операция отменена' },
-    'СУПЕРМАТИЗМ': { emoji: '🎯', text: 'Наведение', desc: 'Корректировка координат' },
-    'НЕРЧИНСКИЙ': { emoji: '🚀', text: 'РВСН', desc: 'Ракетные войска стратегического назначения' },
-    
-    // Геополитические маркеры
-    'ЛАТВИЯ': { emoji: '🌍', text: 'Геополитический сигнал', desc: 'Привязка к Прибалтике' },
-    'КАВКАЗ': { emoji: '🌍', text: 'Геополитический сигнал', desc: 'Привязка к Кавказу' },
-    'КИТАЙСКИЙ': { emoji: '🌍', text: 'Геополитический сигнал', desc: 'Привязка к Китаю' },
-    'СССР': { emoji: '🏛️', text: 'Исторический артефакт', desc: 'Вероятно, ошибка оператора' },
-};
+// ----- Глобальные переменные -----
+let messages = [];
+let map = null;
+let markers = [];
 
-// БАЗА СООБЩЕНИЙ (только те, что мы умеем переводить)
-// Формат: { date, time, callsign, code, word, digits, translation }
-const MESSAGES = [
-    // ===== 2026 =====
-    { date: '2026-06-25', time: '19:01', callsign: 'НЖТИ', code: '09989', word: 'ОБЕЗЬЯНКА', digits: '3641 5048',
-        translation: '✅ Завершение операции (Отбой)' },
-    { date: '2026-06-24', time: '17:04', callsign: 'ЦЖАП ЗМО9', code: '64308', word: 'ФЛЮСОБОБ', digits: '0104 2087',
-        translation: '📡 Смена частоты на 2087 кГц' },
-    { date: '2026-06-24', time: '16:49', callsign: 'НЖТИ', code: '73585', word: 'АМИДОМАЙН', digits: '0010 7943',
-        translation: '🎯 Боевой приказ (ID цели 7943)' },
-    { date: '2026-05-21', time: '15:38', callsign: 'НЖТИ', code: '61401', word: 'АКРОФИ', digits: '0303 6994',
-        translation: '🗺️ Маршрут: старт (Индийский океан)' },
-    { date: '2026-05-21', time: '15:38', callsign: 'НЖТИ', code: '61401', word: 'РУБАХА', digits: '9148 0718',
-        translation: '🗺️ Маршрут: цель (Арктика)' },
-    { date: '2026-04-13', time: '16:02', callsign: 'НЖТИ', code: '72871', word: 'КИТАЙСКИЙ', digits: '8875 1328',
-        translation: '🌍 Геополитический сигнал (Китай)' },
-    { date: '2026-03-12', time: '15:56', callsign: 'НЖТИ', code: '49749', word: 'КАВКАЗ', digits: '0104 4657',
-        translation: '📡 Смена частоты на 4657 кГц + привязка к Кавказу' },
-    { date: '2026-02-11', time: '12:53', callsign: 'НЖТИ', code: '30601', word: 'СССР', digits: '8235 0802',
-        translation: '🏛️ Исторический артефакт (ошибка оператора)' },
-    
-    // ===== 2025 =====
-    { date: '2025-11-17', time: '14:40', callsign: 'НЖТИ', code: '15854', word: 'ЛАТВИЯ', digits: '5894 4167',
-        translation: '🌍 Геополитический сигнал (Прибалтика)' },
-    { date: '2025-07-10', time: '11:07', callsign: 'НЖТИ', code: '62679', word: 'ТАКСА', digits: '0216 5516',
-        translation: '🔍 Неизвестный код (требуется уточнение)' },
-    
-    // ===== 2024 =====
-    { date: '2024-09-18', time: '13:37', callsign: 'ЦЖАП', code: '30300', word: 'ЗЛАКОБАК', digits: '0010 9160',
-        translation: '🎯 Боевой приказ + смена частоты на 9160 кГц' },
-    { date: '2024-07-31', time: '16:34', callsign: 'ЦЖАП РХ51 БХВС ТОД3', code: '89510', word: 'НЕРЧИНСКИЙ',
-        digits: '0010 5422', translation: '🚀 Ракетные войска (РВСН), ID цели 5422' },
-    
-    // ===== 2023 =====
-    { date: '2023-07-06', time: '13:04', callsign: 'НЖТИ', code: '34853', word: 'ГОЛОСОК', digits: '8017 8154',
-        translation: '🔊 Активация сети' },
-    { date: '2023-06-22', time: '11:13', callsign: 'НЖТИ', code: '90047', word: 'МЕРЗЛЫЙ', digits: '0808 2023',
-        translation: '🛠️ Техническая проверка (ID 0808)' },
-];
+// ----- Загрузка CSV -----
+async function loadCSV() {
+    try {
+        const response = await fetch('data/messages.csv');
+        const text = await response.text();
+        const lines = text.split('\n').filter(line => line.trim());
+        const headers = lines[0].split(',').map(h => h.trim());
+
+        messages = lines.slice(1).map(line => {
+            const values = line.split(',').map(v => v.trim());
+            const obj = {};
+            headers.forEach((h, i) => obj[h] = values[i] || '');
+            return obj;
+        });
+
+        console.log(`✅ Загружено ${messages.length} сообщений`);
+        renderAll();
+    } catch (e) {
+        console.error('❌ Ошибка загрузки CSV:', e);
+        document.getElementById('messagesBody').innerHTML =
+            '<tr><td colspan="4" style="text-align:center;color:#ff4444;">Ошибка загрузки данных</td></tr>';
+    }
+}
+
+// ----- Рендеринг -----
+function renderAll() {
+    updateStats();
+    renderTable();
+    renderFrequencies();
+    renderDict();
+    renderInsights();
+    initMap();
+    updateClock();
+}
+
+// ----- Статистика -----
+function updateStats() {
+    document.getElementById('totalCount').textContent = messages.length;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const todayCount = messages.filter(m => m.date === today).length;
+    document.getElementById('todayCount').textContent = todayCount;
+
+    if (messages.length > 0) {
+        const last = messages[messages.length - 1];
+        document.getElementById('lastDate').textContent = last.date || '--';
+    }
+
+    const dictSize = Object.keys(CONFIG.dict).length +
+                     Object.keys(CONFIG.opCodes).length;
+    document.getElementById('dictSize').textContent = dictSize;
+}
+
+// ----- Таблица -----
+function renderTable() {
+    const tbody = document.getElementById('messagesBody');
+
+    if (!messages.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#5a6a7a;">Нет данных</td></tr>';
+        return;
+    }
+
+    // Берём последние 50 для таблицы
+    const recent = messages.slice(-50).reverse();
+
+    let html = '';
+    recent.forEach(msg => {
+        const dateStr = msg.date ? msg.date.slice(5) : '--';
+        const timeStr = msg.time || '--';
+        const callsign = msg.callsign || '--';
+        const word = msg.word_1 || '';
+
+        // Пытаемся перевести
+        let translation = word;
+        let emoji = '📻';
+
+        if (CONFIG.dict[word]) {
+            translation = CONFIG.dict[word].text;
+            emoji = CONFIG.dict[word].emoji;
+        } else if (CONFIG.opCodes[word]) {
+            translation = CONFIG.opCodes[word].text;
+            emoji = CONFIG.opCodes[word].emoji;
+        }
+
+        const digits = [msg.digits_1, msg.digits_2, msg.digits_3, msg.digits_4]
+            .filter(d => d && d.trim())
+            .join(' ');
+
+        html += `
+            <tr>
+                <td>${dateStr} ${timeStr}</td>
+                <td><span class="highlight">${callsign}</span></td>
+                <td>${emoji} ${translation}</td>
+                <td style="font-family:monospace;font-size:0.8rem;color:#8b949e;">${digits || '—'}</td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+}
+
+// ----- Частоты -----
+function renderFrequencies() {
+    const container = document.getElementById('freqGrid');
+    if (!container) return;
+
+    let html = '';
+    CONFIG.frequencies.forEach(f => {
+        const statusClass = f.status || 'known';
+        html += `
+            <button class="freq-btn" data-freq="${f.freq}">
+                ${f.freq} кГц
+                <span class="badge ${statusClass}">${f.label || f.status}</span>
+            </button>
+        `;
+    });
+
+    container.innerHTML = html;
+
+    // Клик по частоте
+    container.querySelectorAll('.freq-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            container.querySelectorAll('.freq-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            const freq = this.dataset.freq;
+            showFreqInfo(freq);
+        });
+    });
+
+    // Активируем первую
+    const first = container.querySelector('.freq-btn');
+    if (first) first.classList.add('active');
+}
+
+function showFreqInfo(freq) {
+    const f = CONFIG.frequencies.find(f => f.freq == freq);
+    if (!f) return;
+
+    const info = document.getElementById('freqInfo');
+    if (info) {
+        info.innerHTML = `
+            <div style="display:flex;align-items:center;gap:12px;padding:8px 0;">
+                <span style="font-size:1.8rem;color:#58a6ff;">📡</span>
+                <div>
+                    <div style="font-size:1.2rem;font-weight:600;color:#f0e6d0;">${f.freq} кГц</div>
+                    <div style="color:#8b949e;font-size:0.85rem;">${f.name} — ${f.desc || ''}</div>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// ----- Словарь -----
+function renderDict() {
+    const container = document.getElementById('dictGrid');
+    if (!container) return;
+
+    const entries = Object.entries(CONFIG.dict);
+    let html = '';
+    entries.forEach(([word, data]) => {
+        html += `
+            <div class="dict-item">
+                <span class="emoji">${data.emoji}</span>
+                <span class="word">${word}</span>
+                <span class="meaning">→ ${data.text}</span>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+// ----- Инсайты -----
+function renderInsights() {
+    const container = document.getElementById('insightsGrid');
+    if (!container) return;
+
+    const icons = ['🧠', '📊', '🗺️', '📡', '🔮'];
+    let html = '';
+    CONFIG.insights.forEach((insight, i) => {
+        html += `
+            <div class="insight-card">
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span style="font-size:1.6rem;">${icons[i % icons.length]}</span>
+                    <div>
+                        <div class="title">${insight.split(':')[0] || 'Вывод'}</div>
+                        <div class="desc">${insight}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+// ----- Карта -----
+function initMap() {
+    if (map) {
+        map.remove();
+        markers = [];
+    }
+
+    map = L.map('map', {
+        center: [55.0, 40.0],
+        zoom: 4,
+        zoomControl: true,
+        fadeAnimation: true,
+        attributionControl: true
+    });
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, &copy; CartoDB'
+    }).addTo(map);
+
+    // Добавляем цели из сообщений с координатами
+    messages.forEach(msg => {
+        const digits = [msg.digits_1, msg.digits_2, msg.digits_3, msg.digits_4]
+            .filter(d => d && d.trim());
+
+        // Ищем координаты (4-значные группы)
+        digits.forEach(d => {
+            const coords = parseCoordinates(d);
+            if (coords) {
+                const shifted = applyShift(coords.lat, coords.lon);
+                addMarker(shifted.lat, shifted.lon, msg);
+            }
+        });
+    });
+
+    // Если маркеров нет — ставим тестовые
+    if (markers.length === 0) {
+        const testPoints = [
+            [50.47, 95.27, 'Тыва (РЛС)'],
+            [56.22, 29.02, 'Псковская область (авиабаза)'],
+            [60.46, 18.52, 'Финский залив']
+        ];
+        testPoints.forEach(([lat, lon, name]) => {
+            L.marker([lat, lon])
+                .addTo(map)
+                .bindPopup(`<b>${name}</b><br>Цель после сдвига`);
+            markers.push({ lat, lon });
+        });
+    }
+}
+
+function parseCoordinates(str) {
+    // Ищем 4-значные числа: 48.47 или 4847
+    const clean = str.replace(/\s/g, '');
+    if (clean.length === 4) {
+        const lat = parseFloat(clean.slice(0, 2) + '.' + clean.slice(2));
+        // Вторая группа может быть в другом поле
+        return { lat, lon: null };
+    }
+    return null;
+}
+
+function applyShift(lat, lon) {
+    return {
+        lat: lat + CONFIG.shift.lat,
+        lon: lon + CONFIG.shift.lon
+    };
+}
+
+function addMarker(lat, lon, msg) {
+    if (!lat || !lon || isNaN(lat) || isNaN(lon)) return;
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return;
+
+    const popupText = `
+        <b>${msg.callsign || '???'}</b><br>
+        ${msg.date || ''} ${msg.time || ''}<br>
+        Слово: ${msg.word_1 || '—'}<br>
+        <span style="color:#58a6ff;">${lat.toFixed(2)}°N, ${lon.toFixed(2)}°E</span>
+    `;
+
+    const marker = L.circleMarker([lat, lon], {
+        radius: 8,
+        fillColor: '#58a6ff',
+        color: '#58a6ff',
+        weight: 1,
+        opacity: 0.8,
+        fillOpacity: 0.6
+    }).addTo(map)
+      .bindPopup(popupText);
+
+    markers.push({ lat, lon, marker });
+}
+
+// ----- Часы -----
+function updateClock() {
+    const now = new Date();
+    const msk = new Date(now.getTime() + (3 * 60 * 60 * 1000));
+    const timeStr = msk.toISOString().slice(11, 19);
+    document.getElementById('clock').textContent = timeStr + ' MSK';
+    setTimeout(updateClock, 1000);
+}
+
+// ----- Прогноз -----
+function generateForecast() {
+    const now = new Date();
+    const msk = new Date(now.getTime() + (3 * 60 * 60 * 1000));
+    const day = msk.getDay();
+    const hour = msk.getHours();
+    const month = msk.getMonth() + 1;
+
+    let forecast = 'Спокойный эфир.';
+
+    // Проверяем пик активности
+    if (day === CONFIG.schedule.peakDay &&
+        hour >= CONFIG.schedule.peakHourStart &&
+        hour < CONFIG.schedule.peakHourEnd) {
+        forecast = '🔴 ВЫСОКАЯ ВЕРОЯТНОСТЬ ПРИКАЗОВ. Пик активности (ЧТ 13:00 MSK)';
+    } else if (CONFIG.schedule.seasonal.includes(month)) {
+        forecast = '🟡 СЕЗОННЫЙ ВСПЛЕСК. Вероятны учения (июнь/июль/декабрь)';
+    } else if (hour >= 9 && hour <= 22) {
+        forecast = '🟢 Активность в рабочем диапазоне. Слушайте 4625 кГц';
+    } else {
+        forecast = '🌙 Ночной эфир. Голосовых сообщений обычно нет';
+    }
+
+    document.getElementById('forecastText').textContent = forecast;
+}
+
+// ----- Инициализация -----
+document.addEventListener('DOMContentLoaded', function() {
+    loadCSV();
+    setTimeout(generateForecast, 100);
+
+    // Кнопка обновления прогноза
+    const refreshBtn = document.getElementById('refreshForecast');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', generateForecast);
+    }
+});
+
+// Экспортируем для консоли
+window.__uvb = { messages, CONFIG, map, markers };
