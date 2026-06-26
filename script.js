@@ -1,90 +1,84 @@
 // ============================================
-//  script.js — Умный анализатор УВБ-76 (гибрид)
+//  script.js — Живая система УВБ-76
 // ============================================
 
-let messages = [];
-let map = null;
-let markers = [];
-let currentFreq = 4625;
-let volume = 70;
-let noiseReduction = 50;
+// ----- СОСТОЯНИЕ -----
+let state = {
+    messages: [],
+    map: null,
+    markers: [],
+    routes: [],
+    currentFreq: 4625,
+    volume: 70,
+    noiseReduction: 50,
+    isInitialized: false
+};
 
-// ----- ЗАГРУЗКА CSV ИЛИ ВСТРОЕННЫХ ДАННЫХ -----
+// ----- ЗАГРУЗКА ДАННЫХ -----
 async function loadData() {
-    let loaded = false;
-
-    // Пытаемся загрузить CSV
     try {
         const response = await fetch('data/messages.csv');
-        if (response.ok) {
-            const text = await response.text();
-            const lines = text.split('\n').filter(line => line.trim());
-            if (lines.length > 1) {
-                const headers = lines[0].split(',').map(h => h.trim());
-                messages = lines.slice(1).map(line => {
-                    const values = line.split(',').map(v => v.trim());
-                    const obj = {};
-                    headers.forEach((h, i) => obj[h] = values[i] || '');
-                    return obj;
-                });
-                console.log(`✅ Загружено ${messages.length} сообщений из CSV`);
-                loaded = true;
-            }
-        }
+        const text = await response.text();
+        const lines = text.split('\n').filter(line => line.trim());
+        const headers = lines[0].split(',').map(h => h.trim());
+
+        state.messages = lines.slice(1).map(line => {
+            const values = line.split(',').map(v => v.trim());
+            const obj = {};
+            headers.forEach((h, i) => obj[h] = values[i] || '');
+            return obj;
+        });
+
+        console.log(`✅ Загружено ${state.messages.length} сообщений`);
+        initSystem();
     } catch (e) {
-        console.log('CSV не найден, использую встроенные данные');
+        console.error('❌ Ошибка загрузки:', e);
+        document.querySelector('#messagesBody').innerHTML =
+            '<tr><td colspan="4" style="text-align:center;color:#ff4444;">Ошибка загрузки данных</td></tr>';
     }
+}
 
-    // Если CSV не загрузился — берём из CONFIG
-    if (!loaded && CONFIG.messages && CONFIG.messages.length) {
-        messages = CONFIG.messages.map(m => ({
-            date: m.date,
-            time: m.time,
-            callsign: m.callsign,
-            group: m.code || '',
-            word_1: m.word,
-            digits_1: m.digits,
-            digits_2: '',
-            digits_3: '',
-            digits_4: '',
-        }));
-        console.log(`✅ Загружено ${messages.length} сообщений из CONFIG`);
-    }
-
-    if (!messages.length) {
-        console.warn('⚠️ Нет данных для отображения');
-        document.getElementById('messagesBody').innerHTML =
-            '<tr><td colspan="4" style="text-align:center;color:#5a6a7a;">Нет данных. Загрузите CSV или добавьте сообщения в CONFIG.messages</td></tr>';
-        return;
-    }
-
+// ----- ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ -----
+function initSystem() {
+    state.isInitialized = true;
     renderAll();
+    setInterval(autoUpdate, 60000); // Обновление раз в минуту
+}
+
+// ----- АВТООБНОВЛЕНИЕ -----
+function autoUpdate() {
+    if (!state.isInitialized) return;
+    renderStats();
+    renderForecast();
+    renderLastTwoDays();
+    updateMapDescription();
+    // Не перерисовываем карту и таблицу полностью, только данные
 }
 
 // ----- РЕНДЕРИНГ ВСЕГО -----
 function renderAll() {
-    updateStats();
+    renderStats();
     renderAllMessages();
     renderLastTwoDays();
     renderFrequencies();
     renderForecast();
     renderMap();
-    updateClock();
-    updateMapDescription();
     renderInsights();
     renderDict();
+    updateClock();
+    updateMapDescription();
 }
 
 // ----- СТАТИСТИКА -----
-function updateStats() {
-    document.getElementById('totalCount').textContent = messages.length;
+function renderStats() {
+    document.getElementById('totalCount').textContent = state.messages.length;
 
     const today = new Date().toISOString().slice(0, 10);
-    const todayCount = messages.filter(m => m.date === today).length;
+    const todayCount = state.messages.filter(m => m.date === today).length;
     document.getElementById('todayCount').textContent = todayCount;
 
-    if (messages.length > 0) {
-        const last = messages[messages.length - 1];
+    if (state.messages.length > 0) {
+        const last = state.messages[state.messages.length - 1];
         document.getElementById('lastDate').textContent = last.date || '--';
     }
 
@@ -93,17 +87,93 @@ function updateStats() {
     document.getElementById('dictSize').textContent = dictSize;
 }
 
-// ----- ВСЕ СООБЩЕНИЯ -----
+// ----- ПЕРЕВОД (автоматический) -----
+function translateMessage(msg) {
+    const word = msg.word_1 || '';
+    const digits = [msg.digits_1, msg.digits_2, msg.digits_3, msg.digits_4]
+        .filter(d => d && d.trim())
+        .join(' ');
+
+    // 1. Проверяем коды операций
+    if (CONFIG.opCodes[word]) {
+        const op = CONFIG.opCodes[word];
+        // Если есть цифры — дополняем
+        let extra = '';
+        if (word === '0104' && digits) {
+            extra = ` → ${digits} кГц`;
+        }
+        if (word === '0010' && digits) {
+            const coords = decodeCoordinates(digits);
+            if (coords) {
+                extra = ` → ${coords.shifted.lat.toFixed(2)}°N, ${coords.shifted.lon.toFixed(2)}°E`;
+            }
+        }
+        return `${op.emoji} ${op.text}${extra}`;
+    }
+
+    // 2. Проверяем словарь
+    if (CONFIG.dict[word]) {
+        const d = CONFIG.dict[word];
+        let extra = '';
+        if (d.type === 'target' && digits) {
+            const coords = decodeCoordinates(digits);
+            if (coords) {
+                extra = ` → ${coords.shifted.lat.toFixed(2)}°N, ${coords.shifted.lon.toFixed(2)}°E`;
+            }
+        }
+        return `${d.emoji} ${d.text}${extra}`;
+    }
+
+    // 3. Если есть код 0010 или 0104 в цифрах
+    if (digits.includes('0010')) {
+        const coords = decodeCoordinates(digits);
+        if (coords) {
+            return `🎯 Боевой приказ → ${coords.shifted.lat.toFixed(2)}°N, ${coords.shifted.lon.toFixed(2)}°E`;
+        }
+        return '🎯 Боевой приказ (координаты не распознаны)';
+    }
+    if (digits.includes('0104')) {
+        const freqMatch = digits.match(/\b(\d{4})\b/);
+        if (freqMatch) {
+            return `📡 Смена частоты → ${freqMatch[1]} кГц`;
+        }
+        return '📡 Смена частоты';
+    }
+
+    // 4. Неизвестно
+    return `📻 ${word || 'Неизвестно'}`;
+}
+
+// ----- ДЕКОДИРОВАНИЕ КООРДИНАТ -----
+function decodeCoordinates(digits) {
+    const parts = digits.split(/\s+/);
+    for (let i = 0; i < parts.length - 1; i++) {
+        if (parts[i].length === 4 && parts[i + 1].length === 4) {
+            const lat = parseFloat(parts[i].slice(0, 2) + '.' + parts[i].slice(2));
+            const lon = parseFloat(parts[i + 1].slice(0, 2) + '.' + parts[i + 1].slice(2));
+            if (!isNaN(lat) && !isNaN(lon) && lat > -90 && lat < 90 && lon > -180 && lon < 180) {
+                return {
+                    original: { lat, lon },
+                    shifted: {
+                        lat: lat + CONFIG.shift.lat,
+                        lon: lon + CONFIG.shift.lon
+                    }
+                };
+            }
+        }
+    }
+    return null;
+}
+
+// ----- ВСЕ СООБЩЕНИЯ (таблица) -----
 function renderAllMessages() {
     const tbody = document.getElementById('messagesBody');
-
-    if (!messages.length) {
+    if (!state.messages.length) {
         tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#5a6a7a;">Нет данных</td></tr>';
         return;
     }
 
-    const all = messages.slice().reverse().slice(0, 100);
-
+    const all = state.messages.slice().reverse();
     let html = '';
     all.forEach(msg => {
         const translation = translateMessage(msg);
@@ -120,11 +190,10 @@ function renderAllMessages() {
             </tr>
         `;
     });
-
     tbody.innerHTML = html;
 }
 
-// ----- ПОСЛЕДНИЕ 2 ДНЯ -----
+// ----- ПОСЛЕДНИЕ 2 ДНЯ (расшифровка) -----
 function renderLastTwoDays() {
     const container = document.getElementById('lastTwoDays');
     if (!container) return;
@@ -133,7 +202,7 @@ function renderLastTwoDays() {
     const twoDaysAgo = new Date(today);
     twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
 
-    const recent = messages.filter(msg => {
+    const recent = state.messages.filter(msg => {
         if (!msg.date) return false;
         const msgDate = new Date(msg.date + 'T00:00:00');
         return msgDate >= twoDaysAgo && msgDate <= today;
@@ -185,47 +254,7 @@ function renderLastTwoDays() {
     container.innerHTML = html;
 }
 
-// ----- ПЕРЕВОД СООБЩЕНИЯ -----
-function translateMessage(msg) {
-    const word = msg.word_1 || '';
-
-    if (CONFIG.opCodes[word]) {
-        return `${CONFIG.opCodes[word].emoji} ${CONFIG.opCodes[word].text}`;
-    }
-
-    if (CONFIG.dict[word]) {
-        return `${CONFIG.dict[word].emoji} ${CONFIG.dict[word].text}`;
-    }
-
-    const digits = [msg.digits_1, msg.digits_2, msg.digits_3, msg.digits_4].join(' ');
-    if (digits.includes('0010')) return '🎯 Боевой приказ (координаты)';
-    if (digits.includes('0104')) return '📡 Смена частоты';
-
-    return `📻 ${word || 'Неизвестно'}`;
-}
-
-// ----- РАСШИФРОВКА КООРДИНАТ -----
-function decodeCoordinates(digits) {
-    const parts = digits.split(/\s+/);
-    for (let i = 0; i < parts.length - 1; i++) {
-        if (parts[i].length === 4 && parts[i+1].length === 4) {
-            const lat = parseFloat(parts[i].slice(0, 2) + '.' + parts[i].slice(2));
-            const lon = parseFloat(parts[i+1].slice(0, 2) + '.' + parts[i+1].slice(2));
-            if (!isNaN(lat) && !isNaN(lon)) {
-                return {
-                    original: { lat, lon },
-                    shifted: {
-                        lat: lat + CONFIG.shift.lat,
-                        lon: lon + CONFIG.shift.lon
-                    }
-                };
-            }
-        }
-    }
-    return null;
-}
-
-// ----- ЧАСТОТЫ -----
+// ----- ЧАСТОТЫ (с включением) -----
 function renderFrequencies() {
     const container = document.getElementById('freqGrid');
     if (!container) return;
@@ -233,8 +262,9 @@ function renderFrequencies() {
     let html = '';
     CONFIG.frequencies.forEach(f => {
         const statusClass = f.status || 'known';
+        const activeClass = f.active ? 'active' : '';
         html += `
-            <button class="freq-btn" data-freq="${f.freq}" data-active="${f.active}">
+            <button class="freq-btn ${activeClass}" data-freq="${f.freq}" data-active="${f.active}">
                 ${f.freq} кГц
                 <span class="badge ${statusClass}">${f.label || f.status}</span>
             </button>
@@ -243,6 +273,7 @@ function renderFrequencies() {
 
     container.innerHTML = html;
 
+    // Клик по частоте
     container.querySelectorAll('.freq-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const freq = parseInt(this.dataset.freq);
@@ -250,6 +281,7 @@ function renderFrequencies() {
         });
     });
 
+    // Ползунки
     setupSliders();
 }
 
@@ -271,26 +303,31 @@ function toggleFreq(freq) {
         }
     });
 
-    currentFreq = freq;
+    state.currentFreq = freq;
     updateFreqInfo(freq);
+    updateStatusBar();
 }
 
 function setupSliders() {
     const volumeSlider = document.getElementById('volumeSlider');
     const volumeValue = document.getElementById('volumeValue');
     if (volumeSlider) {
+        volumeSlider.value = state.volume;
         volumeSlider.addEventListener('input', function() {
-            volume = parseInt(this.value);
-            if (volumeValue) volumeValue.textContent = volume + '%';
+            state.volume = parseInt(this.value);
+            if (volumeValue) volumeValue.textContent = state.volume + '%';
+            updateStatusBar();
         });
     }
 
     const noiseSlider = document.getElementById('noiseSlider');
     const noiseValue = document.getElementById('noiseValue');
     if (noiseSlider) {
+        noiseSlider.value = state.noiseReduction;
         noiseSlider.addEventListener('input', function() {
-            noiseReduction = parseInt(this.value);
-            if (noiseValue) noiseValue.textContent = noiseReduction + '%';
+            state.noiseReduction = parseInt(this.value);
+            if (noiseValue) noiseValue.textContent = state.noiseReduction + '%';
+            updateStatusBar();
         });
     }
 }
@@ -307,11 +344,19 @@ function updateFreqInfo(freq) {
                 <span style="font-size:1.8rem;color:#58a6ff;">📡</span>
                 <div>
                     <div style="font-size:1.2rem;font-weight:600;color:#f0e6d0;">${f.freq} кГц</div>
-                    <div style="color:#8b949e;font-size:0.85rem;">${f.name} — <span style="color:${f.active ? '#00ff88' : '#ff6666'};">${status}</span></div>
+                    <div style="color:#8b949e;font-size:0.85rem;">${f.name} — ${f.desc || ''} <span style="color:${f.active ? '#00ff88' : '#ff6666'};">${status}</span></div>
                 </div>
             </div>
         `;
     }
+}
+
+function updateStatusBar() {
+    const activeFreq = CONFIG.frequencies.find(f => f.active === true);
+    const freqText = activeFreq ? `${activeFreq.freq} кГц` : 'нет';
+    document.getElementById('statusFreq').textContent = freqText;
+    document.getElementById('statusVolume').textContent = state.volume + '%';
+    document.getElementById('statusNoise').textContent = state.noiseReduction + '%';
 }
 
 // ----- ПРОГНОЗ -----
@@ -333,11 +378,13 @@ function renderForecast() {
                 <div style="font-size:0.7rem;color:#8b949e;text-transform:uppercase;letter-spacing:1px;">Сегодня</div>
                 <div style="font-size:1.6rem;font-weight:600;color:${getColor(todayProb)};">${todayProb}%</div>
                 <div style="font-size:0.8rem;color:#5a6a7a;">${getDescription(todayProb)}</div>
+                <div style="font-size:0.7rem;color:#5a6a7a;margin-top:4px;">${getPredictionText(todayProb)}</div>
             </div>
             <div style="background:rgba(16,24,40,0.5);border-radius:8px;padding:12px 16px;border:1px solid #1a2a4a;">
                 <div style="font-size:0.7rem;color:#8b949e;text-transform:uppercase;letter-spacing:1px;">Завтра</div>
                 <div style="font-size:1.6rem;font-weight:600;color:${getColor(tomorrowProb)};">${tomorrowProb}%</div>
                 <div style="font-size:0.8rem;color:#5a6a7a;">${getDescription(tomorrowProb)}</div>
+                <div style="font-size:0.7rem;color:#5a6a7a;margin-top:4px;">${getPredictionText(tomorrowProb)}</div>
             </div>
             <div style="background:rgba(16,24,40,0.5);border-radius:8px;padding:12px 16px;border:1px solid #1a2a4a;">
                 <div style="font-size:0.7rem;color:#8b949e;text-transform:uppercase;letter-spacing:1px;">Неделя</div>
@@ -345,12 +392,15 @@ function renderForecast() {
                     ${weekForecast.map(d => `
                         <div style="flex:1;min-width:28px;text-align:center;">
                             <div style="font-size:0.6rem;color:#5a6a7a;">${d.label}</div>
-                            <div style="height:40px;display:flex;align-items:flex-end;justify-content:center;">
-                                <div style="width:100%;height:${d.prob}%;background:${getColor(d.prob)};border-radius:3px 3px 0 0;min-height:4px;transition:height 0.5s;"></div>
+                            <div style="height:50px;display:flex;align-items:flex-end;justify-content:center;">
+                                <div style="width:100%;height:${d.prob}%;background:${getColor(d.prob)};border-radius:3px 3px 0 0;min-height:4px;transition:height 0.5s;box-shadow:0 0 10px ${getColor(d.prob)}33;"></div>
                             </div>
                             <div style="font-size:0.6rem;color:#8b949e;">${d.prob}%</div>
                         </div>
                     `).join('')}
+                </div>
+                <div style="font-size:0.7rem;color:#5a6a7a;margin-top:8px;text-align:center;">
+                    📊 ${getWeekSummary(weekForecast)}
                 </div>
             </div>
         </div>
@@ -366,9 +416,8 @@ function calculateDayProbability(date) {
     const seasonal = CONFIG.seasonalBoost[month] || 1.0;
     prob = prob * seasonal;
 
-    if (hour >= 12 && hour <= 15) {
-        prob = prob * 1.3;
-    }
+    if (hour >= 12 && hour <= 15) prob = prob * 1.3;
+    if (hour >= 23 || hour <= 6) prob = prob * 0.5;
 
     prob = Math.min(95, Math.max(5, Math.round(prob * 100)));
     return prob;
@@ -381,8 +430,8 @@ function calculateWeekForecast() {
         const d = new Date(today);
         d.setDate(d.getDate() + i);
         const prob = calculateDayProbability(d);
-        const label = CONFIG.forecastWeights[d.getDay()]?.label || ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'][d.getDay()];
-        week.push({ label, prob });
+        const labels = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+        week.push({ label: labels[d.getDay()], prob });
     }
     return week;
 }
@@ -399,25 +448,43 @@ function getDescription(prob) {
     return '🟢 Низкая активность';
 }
 
-// ----- КАРТА -----
+function getPredictionText(prob) {
+    if (prob >= 80) return 'Вероятны боевые приказы';
+    if (prob >= 60) return 'Вероятны техпроверки';
+    if (prob >= 40) return 'Обычный эфир';
+    return 'Спокойный эфир';
+}
+
+function getWeekSummary(week) {
+    const high = week.filter(d => d.prob >= 70).length;
+    if (high >= 3) return `🔥 ${high} дней высокой активности`;
+    if (high >= 1) return `⚡ ${high} день с высокой активностью`;
+    return '🌊 Спокойная неделя';
+}
+
+// ----- КАРТА (с анимацией) -----
 function renderMap() {
-    if (map) {
-        map.remove();
-        markers = [];
+    if (state.map) {
+        state.map.remove();
+        state.markers = [];
+        state.routes = [];
     }
 
-    map = L.map('map', {
+    state.map = L.map('map', {
         center: [55.0, 40.0],
         zoom: 4,
-        zoomControl: true
+        zoomControl: true,
+        fadeAnimation: true,
+        attributionControl: true
     });
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap, CartoDB'
-    }).addTo(map);
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, &copy; CartoDB'
+    }).addTo(state.map);
 
-    let added = 0;
-    messages.forEach(msg => {
+    // Собираем точки с координатами
+    const points = [];
+    state.messages.forEach(msg => {
         const digits = [msg.digits_1, msg.digits_2, msg.digits_3, msg.digits_4]
             .filter(d => d && d.trim())
             .join(' ');
@@ -426,143 +493,67 @@ function renderMap() {
         if (decoded) {
             const { lat, lon } = decoded.shifted;
             if (!isNaN(lat) && !isNaN(lon) && lat > -90 && lat < 90 && lon > -180 && lon < 180) {
-                addMarker(lat, lon, msg);
-                added++;
+                points.push({ lat, lon, msg });
             }
         }
     });
 
-    if (added === 0) {
-        const testPoints = [
-            [50.47, 95.27, 'Тыва (РЛС)', 'Из перехвата 15.06.2023'],
-            [56.22, 29.02, 'Псковская область (авиабаза)', 'Из перехвата 24.06.2026'],
-            [60.46, 18.52, 'Финский залив', 'Из перехвата 21.05.2026']
-        ];
-        testPoints.forEach(([lat, lon, name, src]) => {
-            L.marker([lat, lon])
-                .addTo(map)
-                .bindPopup(`<b>${name}</b><br>${src}<br><span style="color:#58a6ff;">${lat.toFixed(2)}°N, ${lon.toFixed(2)}°E</span>`);
-            markers.push({ lat, lon, name, src });
-        });
-    }
-
-    updateMapDescription();
-    setTimeout(() => map.invalidateSize(), 300);
-}
-
-function addMarker(lat, lon, msg) {
-    const word = msg.word_1 || 'Неизвестно';
-    const translation = translateMessage(msg);
-    const popupText = `
-        <b>${msg.callsign || '???'}</b><br>
-        ${msg.date || ''} ${msg.time || ''}<br>
-        Слово: ${word}<br>
-        ${translation}<br>
-        <span style="color:#58a6ff;">${lat.toFixed(2)}°N, ${lon.toFixed(2)}°E</span>
-        <br><span style="color:#5a6a7a;font-size:0.75rem;">📍 После сдвига +2°/+5°</span>
-    `;
-
-    const marker = L.circleMarker([lat, lon], {
-        radius: 8,
-        fillColor: '#58a6ff',
-        color: '#58a6ff',
-        weight: 1,
-        opacity: 0.8,
-        fillOpacity: 0.6
-    }).addTo(map)
-      .bindPopup(popupText);
-
-    markers.push({ lat, lon, marker, msg });
-}
-
-// ----- ОПИСАНИЕ ПОД КАРТОЙ -----
-function updateMapDescription() {
-    const container = document.getElementById('mapDescription');
-    if (!container) return;
-
-    const total = markers.length;
-    const active = messages.filter(m => {
-        const d = new Date(m.date + 'T' + (m.time || '00:00'));
-        const now = new Date();
-        const diff = (now - d) / (1000 * 60 * 60 * 24);
-        return diff < 2;
-    }).length;
-
-    let text = `📍 Всего целей на карте: ${total}. Активных за последние 2 дня: ${active}.`;
-
-    if (active > 0) {
-        text += ' 🔴 Обнаружена активность в последние 48 часов.';
-    } else {
-        text += ' 🟢 За последние 48 часов активность не зафиксирована.';
-    }
-
-    container.textContent = text;
-}
-
-// ----- ИНСАЙТЫ -----
-function renderInsights() {
-    const container = document.getElementById('insightsGrid');
-    if (!container) return;
-
-    const icons = ['🧠', '📊', '🗺️', '📡', '🔮'];
-    let html = '';
-    CONFIG.insights.forEach((insight, i) => {
-        const parts = insight.split(':');
-        const title = parts[0] || 'Вывод';
-        const desc = insight;
-        html += `
-            <div class="insight-card">
-                <div style="display:flex;align-items:center;gap:10px;">
-                    <span style="font-size:1.6rem;">${icons[i % icons.length]}</span>
-                    <div>
-                        <div class="title">${title}</div>
-                        <div class="desc">${desc}</div>
-                    </div>
-                </div>
-            </div>
-        `;
+    // Сортируем по времени
+    points.sort((a, b) => {
+        const da = a.msg.date || '0000-00-00';
+        const db = b.msg.date || '0000-00-00';
+        return da.localeCompare(db) || (a.msg.time || '00:00').localeCompare(b.msg.time || '00:00');
     });
 
-    container.innerHTML = html;
-}
+    // Рисуем точки
+    points.forEach((p, index) => {
+        const color = getPointColor(p.msg);
+        const marker = L.circleMarker([p.lat, p.lon], {
+            radius: 8,
+            fillColor: color,
+            color: color,
+            weight: 2,
+            opacity: 0.8,
+            fillOpacity: 0.7
+        }).addTo(state.map);
 
-// ----- СЛОВАРЬ -----
-function renderDict() {
-    const container = document.getElementById('dictGrid');
-    if (!container) return;
-
-    const entries = Object.entries(CONFIG.dict);
-    let html = '';
-    entries.forEach(([word, data]) => {
-        html += `
-            <div class="dict-item">
-                <span class="emoji">${data.emoji}</span>
-                <span class="word">${word}</span>
-                <span class="meaning">→ ${data.text}</span>
-            </div>
+        const translation = translateMessage(p.msg);
+        const popupText = `
+            <b>${p.msg.callsign || '???'}</b><br>
+            ${p.msg.date || ''} ${p.msg.time || ''}<br>
+            ${translation}<br>
+            <span style="color:#58a6ff;">${p.lat.toFixed(2)}°N, ${p.lon.toFixed(2)}°E</span>
+            <br><span style="color:#5a6a7a;font-size:0.75rem;">📍 После сдвига +2°/+5°</span>
         `;
+        marker.bindPopup(popupText);
+
+        state.markers.push({ lat: p.lat, lon: p.lon, marker, msg: p.msg });
+
+        // Рисуем маршруты (соединяем точки по времени)
+        if (index > 0 && index < points.length) {
+            const prev = points[index - 1];
+            const route = L.polyline(
+                [[prev.lat, prev.lon], [p.lat, p.lon]],
+                { color: '#58a6ff', weight: 1.5, opacity: 0.3, dashArray: '5, 10' }
+            ).addTo(state.map);
+            state.routes.push(route);
+        }
     });
 
-    container.innerHTML = html;
-}
-
-// ----- ЧАСЫ -----
-function updateClock() {
-    const now = new Date();
-    const msk = new Date(now.getTime() + (3 * 60 * 60 * 1000));
-    const timeStr = msk.toISOString().slice(11, 19);
-    document.getElementById('clock').textContent = timeStr + ' MSK';
-    setTimeout(updateClock, 1000);
-}
-
-// ----- ЗАПУСК -----
-document.addEventListener('DOMContentLoaded', function() {
-    loadData();
-
-    const refreshBtn = document.getElementById('refreshForecast');
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', renderForecast);
+    // Добавляем зоны активности
+    if (points.length > 0) {
+        const center = getCenter(points);
+        const zone = L.circle([center.lat, center.lon], {
+            radius: 300000,
+            color: '#58a6ff',
+            weight: 1,
+            opacity: 0.15,
+            fillColor: '#58a6ff',
+            fillOpacity: 0.05
+        }).addTo(state.map);
+        state.routes.push(zone);
     }
-});
 
-window.__uvb = { messages, CONFIG, map, markers };
+    // Если нет точек — тестовые
+    if (points.length === 0) {
+        c
