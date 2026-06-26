@@ -1,1 +1,92 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>УВБ-76 — Живой анализатор</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="https://img.icons8.com/fluency/48/bat.png">
+</head>
+<body>
 
+<div class="container">
+
+    <!-- ШАПКА -->
+    <header>
+        <h1>🦇 УВБ-76 <small>Живой анализатор</small></h1>
+        <div class="clock" id="clock">--:-- MSK</div>
+    </header>
+
+    <!-- СТАТУС -->
+    <div class="status-bar">
+        <div class="status-item">
+            <span class="status-dot" id="statusDot"></span>
+            <span id="statusText">Ожидание...</span>
+        </div>
+        <div class="status-item">
+            <span>📡</span>
+            <span>Частота: <strong id="currentFreq">4625</strong> кГц</span>
+        </div>
+    </div>
+
+    <!-- LIVE ПЕРЕВОД -->
+    <div class="live-block">
+        <div class="live-row">
+            <span class="label">🔊 Что сказано:</span>
+            <span class="value" id="liveText">Ожидание голоса...</span>
+        </div>
+        <div class="live-row translation">
+            <span class="label">📖 Перевод:</span>
+            <span class="value" id="liveTranslation">—</span>
+        </div>
+        <div class="live-row">
+            <span class="label">📟 Морзе:</span>
+            <span class="value" id="liveMorse">—</span>
+        </div>
+    </div>
+
+    <!-- ПРОГНОЗ -->
+    <div class="stat-card" style="margin-bottom:16px;text-align:left;padding:12px 16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:1.2rem;">🔮 Прогноз</span>
+            <button onclick="location.reload()" style="background:rgba(26,42,74,0.6);border:1px solid #1a2a4a;border-radius:20px;padding:4px 12px;color:#c8d6e5;cursor:pointer;font-family:inherit;font-size:0.7rem;">Обновить</button>
+        </div>
+        <div id="forecastText" style="color:#8b949e;font-size:0.9rem;margin-top:6px;">Загрузка...</div>
+    </div>
+
+    <!-- КАРТА -->
+    <div id="map"></div>
+    <div id="mapDescription" style="padding:8px 12px;color:#8b949e;font-size:0.8rem;border-bottom:1px solid #1a2a4a;margin-bottom:12px;">
+        📍 Карта показывает цели, обнаруженные в сообщениях. Координаты скорректированы (+2°/+5°).
+    </div>
+
+    <!-- ЧАСТОТЫ -->
+    <div class="frequencies">
+        <h3>📡 Сеть частот</h3>
+        <div class="freq-grid" id="freqGrid"></div>
+    </div>
+
+    <!-- ИСТОРИЯ -->
+    <div class="history">
+        <h3>📋 Лента переводов</h3>
+        <div id="historyList">
+            <div style="color:#5a6a7a;padding:12px;">Нет перехватов</div>
+        </div>
+    </div>
+
+    <!-- ИНСАЙТЫ -->
+    <h2 style="color:#8b949e;font-weight:400;letter-spacing:2px;font-size:0.8rem;margin:16px 0 12px;">🧠 Неочевидные выводы</h2>
+    <div class="insights" id="insightsGrid"></div>
+
+    <div class="footer">
+        Данные в реальном времени. Нейросеть слушает 4625 кГц и переводит автоматически.
+    </div>
+
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="config.js"></script>
+<script type="module" src="script.js"></script>
+</body>
+                                                                       </html>
