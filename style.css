@@ -1,8 +1,7 @@
 /* ============================================
-   style.css — Batcomputer-стиль
+   style.css — Batcomputer-стиль (обновлён)
    ============================================ */
 
-/* ----- Общие ----- */
 * {
     margin: 0;
     padding: 0;
@@ -23,7 +22,7 @@ body {
     margin: 0 auto;
 }
 
-/* ----- Шапка ----- */
+/* ----- ШАПКА ----- */
 header {
     display: flex;
     justify-content: space-between;
@@ -59,7 +58,7 @@ header .clock {
     text-shadow: 0 0 20px rgba(240, 230, 208, 0.1);
 }
 
-/* ----- Статус-бар ----- */
+/* ----- СТАТУС-БАР ----- */
 .status-bar {
     display: flex;
     gap: 24px;
@@ -93,7 +92,7 @@ header .clock {
     50% { opacity: 0.5; transform: scale(0.8); }
 }
 
-/* ----- Сетка статистики ----- */
+/* ----- СТАТИСТИКА ----- */
 .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -130,7 +129,7 @@ header .clock {
     margin-top: 4px;
 }
 
-/* ----- Частоты ----- */
+/* ----- ЧАСТОТЫ ----- */
 .frequencies {
     background: rgba(16, 24, 40, 0.7);
     border: 1px solid #1a2a4a;
@@ -215,16 +214,16 @@ header .clock {
     50% { opacity: 0.5; }
 }
 
-/* ----- Карта ----- */
+/* ----- КАРТА ----- */
 #map {
-    height: 380px;
+    height: 420px;
     border-radius: 12px;
     border: 1px solid #1a2a4a;
-    margin-bottom: 24px;
+    margin-bottom: 12px;
     background: #0a0e17;
 }
 
-/* ----- Таблица ----- */
+/* ----- ТАБЛИЦА ----- */
 .table-wrap {
     background: rgba(16, 24, 40, 0.7);
     border: 1px solid #1a2a4a;
@@ -264,7 +263,7 @@ header .clock {
     color: #58a6ff;
 }
 
-/* ----- Инсайты ----- */
+/* ----- ИНСАЙТЫ ----- */
 .insights {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -292,11 +291,6 @@ header .clock {
     box-shadow: 0 0 25px rgba(88, 166, 255, 0.06);
 }
 
-.insight-card .icon {
-    font-size: 1.4rem;
-    margin-right: 10px;
-}
-
 .insight-card .title {
     color: #58a6ff;
     font-weight: 600;
@@ -309,7 +303,7 @@ header .clock {
     margin-top: 4px;
 }
 
-/* ----- Словарь ----- */
+/* ----- СЛОВАРЬ ----- */
 .dict-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -347,7 +341,7 @@ header .clock {
     font-size: 0.75rem;
 }
 
-/* ----- Подвал ----- */
+/* ----- ПОДВАЛ ----- */
 .footer {
     text-align: center;
     color: #3a4a6a;
@@ -358,7 +352,7 @@ header .clock {
     margin-top: 20px;
 }
 
-/* ----- Адаптив ----- */
+/* ----- АДАПТИВ ----- */
 @media (max-width: 600px) {
     header {
         flex-direction: column;
@@ -378,4 +372,4 @@ header .clock {
         padding: 6px 14px;
         font-size: 0.75rem;
     }
-}
+   }
