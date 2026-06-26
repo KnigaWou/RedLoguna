@@ -1,14 +1,12 @@
 {
-  "name": "uvb-server",
+  "name": "uvb-proxy",
   "version": "1.0.0",
-  "description": "УВБ-76 сервер",
+  "description": "УВБ-76 прокси-сервер",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "ws": "^8.13.0",
-    "firebase-admin": "^11.10.0",
-    "node-fetch": "^2.6.7"
+    "ws": "^8.13.0"
   }
 }
