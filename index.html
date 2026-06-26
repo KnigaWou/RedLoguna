@@ -76,4 +76,70 @@
                 Обновить
             </button>
         </div>
-        <
+        <div id="forecastText" style="color:#8b949e;font-size:0.95rem;margin-top:8px;padding:8px 0;">
+            Загрузка...
+        </div>
+    </div>
+
+    <!-- ===== КАРТА ===== -->
+    <div id="map"></div>
+
+    <!-- ===== ЧАСТОТЫ ===== -->
+    <div class="frequencies">
+        <h3>📡 Сеть частот</h3>
+        <div id="freqInfo" style="margin-bottom:12px;color:#8b949e;font-size:0.85rem;">
+            Нажмите на частоту для деталей
+        </div>
+        <div class="freq-grid" id="freqGrid">
+            <!-- Заполняется из config.js -->
+        </div>
+    </div>
+
+    <!-- ===== ТАБЛИЦА ===== -->
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Когда</th>
+                    <th>Кто</th>
+                    <th>Перевод</th>
+                    <th>Цифры</th>
+                </tr>
+            </thead>
+            <tbody id="messagesBody">
+                <tr><td colspan="4" style="text-align:center;color:#5a6a7a;">Загрузка...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ===== ИНСАЙТЫ ===== -->
+    <h2 style="color:#8b949e;font-weight:400;letter-spacing:3px;font-size:0.85rem;margin:24px 0 16px;">
+        🧠 Неочевидные выводы
+    </h2>
+    <div class="insights" id="insightsGrid">
+        <!-- Заполняется из config.js -->
+    </div>
+
+    <!-- ===== СЛОВАРЬ ===== -->
+    <h2 style="color:#8b949e;font-weight:400;letter-spacing:3px;font-size:0.85rem;margin:24px 0 16px;">
+        📖 Словарь
+    </h2>
+    <div class="dict-grid" id="dictGrid">
+        <!-- Заполняется из config.js -->
+    </div>
+
+    <!-- ===== ПОДВАЛ ===== -->
+    <div class="footer">
+        Данные перехватов из открытых источников (2023–2026).
+        Карта показывает реальные объекты после сдвига координат.
+    </div>
+
+</div>
+
+<!-- ===== СКРИПТЫ ===== -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="config.js"></script>
+<script src="script.js"></script>
+
+</body>
+                    </html>
