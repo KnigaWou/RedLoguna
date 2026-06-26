@@ -7,6 +7,10 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "ws": "^8.13.0"
+    "ws": "^8.13.0",
+    "node-fetch": "^2.6.7"
+  },
+  "engines": {
+    "node": "18.x"
   }
 }
