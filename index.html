@@ -1,246 +1,150 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>УВБ-76 — Живой анализатор</title>
+    <title>УВБ-76 — Живой приёмник</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0a0e17; color: #c8d6e5; font-family: 'Segoe UI', monospace; padding: 16px; }
+        body { background: #0a0e17; color: #c8d6e5; font-family: monospace; padding: 16px; }
         .container { max-width: 900px; margin: 0 auto; }
-        header { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: rgba(16,24,40,0.85); border: 1px solid #1a2a4a; border-radius: 12px; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
-        header h1 { font-size: 1.3rem; color: #58a6ff; }
-        header h1 small { font-size: 0.7rem; color: #8b949e; }
-        .clock { font-size: 1rem; color: #f0e6d0; letter-spacing: 2px; }
-        .status-bar { display: flex; gap: 16px; flex-wrap: wrap; padding: 8px 14px; background: rgba(16,24,40,0.6); border: 1px solid #1a2a4a; border-radius: 10px; margin-bottom: 12px; font-size: 0.8rem; }
-        .status-item { display: flex; align-items: center; gap: 6px; }
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; transition: 0.3s; }
+        header { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: rgba(16,24,40,0.85); border: 1px solid #1a2a4a; border-radius: 12px; margin-bottom: 16px; }
+        header h1 { font-size: 1.5rem; color: #58a6ff; }
+        .clock { font-size: 1.1rem; color: #f0e6d0; }
+        .status-bar { display: flex; gap: 20px; flex-wrap: wrap; padding: 10px 16px; background: rgba(16,24,40,0.6); border: 1px solid #1a2a4a; border-radius: 10px; margin-bottom: 16px; }
+        .status-item { display: flex; align-items: center; gap: 8px; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #555; }
         .status-dot.active { background: #00ff88; box-shadow: 0 0 15px #00ff88; animation: pulse 1.5s infinite; }
-        .status-dot.warning { background: #ffd93d; box-shadow: 0 0 15px #ffd93d; }
-        .status-dot.error { background: #ff6b6b; box-shadow: 0 0 15px #ff6b6b; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-        .live-block { background: rgba(16,24,40,0.8); border: 1px solid #1a2a4a; border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; }
-        .live-row { display: flex; gap: 10px; padding: 3px 0; font-size: 0.95rem; flex-wrap: wrap; }
-        .live-row .label { color: #8b949e; min-width: 100px; font-size: 0.8rem; }
-        .live-row .value { color: #f0e6d0; word-break: break-word; flex: 1; }
+        .live-block { background: rgba(16,24,40,0.8); border: 1px solid #1a2a4a; border-radius: 12px; padding: 14px 18px; margin-bottom: 16px; }
+        .live-row { display: flex; gap: 12px; padding: 4px 0; font-size: 1rem; flex-wrap: wrap; }
+        .live-row .label { color: #8b949e; min-width: 120px; }
+        .live-row .value { color: #f0e6d0; }
         .live-row.translation .value { color: #58a6ff; font-weight: 600; }
-        .btn { background: #1f6feb; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 0.9rem; cursor: pointer; margin: 4px 4px 4px 0; }
+        .btn { background: #1f6feb; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 0.9rem; cursor: pointer; }
         .btn:hover { background: #58a6ff; }
-        .btn-secondary { background: rgba(26,42,74,0.6); border: 1px solid #1a2a4a; }
-        .btn-secondary:hover { border-color: #58a6ff; }
-        .freq-grid { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
-        .freq-btn { background: rgba(26,42,74,0.5); border: 1px solid #1a2a4a; border-radius: 20px; padding: 4px 14px; color: #8b949e; font-family: inherit; font-size: 0.75rem; cursor: pointer; transition: 0.3s; }
-        .freq-btn.active { border-color: #58a6ff; background: rgba(88,166,255,0.15); color: #58a6ff; box-shadow: 0 0 20px rgba(88,166,255,0.1); }
-        .freq-btn.current { border-color: #ffd93d; color: #ffd93d; }
-        .freq-info { background: rgba(16,24,40,0.5); border-left: 3px solid #58a6ff; padding: 8px 12px; border-radius: 0 8px 8px 0; margin: 6px 0 12px 0; font-size: 0.8rem; color: #8b949e; display: none; }
-        .freq-info.visible { display: block; }
-        .freq-info strong { color: #f0e6d0; }
-        #log { margin-top: 10px; background: #161b22; padding: 10px; border-radius: 8px; font-size: 0.75rem; max-height: 120px; overflow-y: auto; color: #5a6a7a; }
-        #log .ok { color: #6bcb77; }
-        #log .err { color: #ff6b6b; }
-        #log .info { color: #ffd93d; }
-        #log .morse { color: #4dabff; }
-        #log .noise { color: #ff9f43; }
-        .footer { text-align: center; color: #3a4a6a; font-size: 0.65rem; padding: 12px 0; border-top: 1px solid #1a2a4a; margin-top: 12px; }
+        #log { margin-top: 10px; background: #161b22; padding: 10px; border-radius: 8px; font-size: 0.8rem; max-height: 150px; overflow-y: auto; color: #8b949e; }
+        .footer { text-align: center; color: #3a4a6a; font-size: 0.7rem; padding: 12px 0; border-top: 1px solid #1a2a4a; margin-top: 16px; }
         .history-item { display: flex; gap: 10px; padding: 4px 0; border-bottom: 1px solid rgba(26,42,74,0.2); font-size: 0.8rem; }
         .history-item .time { color: #5a6a7a; min-width: 60px; }
         .history-item .text { color: #c8d6e5; flex: 1; }
         .history-item .trans { color: #58a6ff; font-weight: 500; }
-        @media (max-width: 600px) { header { flex-direction: column; text-align: center; } .live-row { flex-direction: column; gap: 2px; } .live-row .label { min-width: auto; } }
     </style>
 </head>
 <body>
 
 <div class="container">
-
     <header>
-        <h1>🦇 УВБ-76 <small>Живой анализатор</small></h1>
+        <h1>🦇 УВБ-76 <small>Живой приёмник</small></h1>
         <div class="clock" id="clock">--:-- MSK</div>
     </header>
 
     <div class="status-bar">
         <div class="status-item">
             <span class="status-dot" id="statusDot"></span>
-            <span id="statusText">Ожидание...</span>
+            <span id="statusText">Подключение...</span>
         </div>
         <div class="status-item">
             <span>📡</span>
-            <span>Частота: <strong id="currentFreqDisplay">4625</strong> кГц</span>
-        </div>
-        <div class="status-item" id="noiseDisplay">
-            <span>🔊</span>
-            <span>Шум: <span id="noiseLevel">0</span>%</span>
+            <span>Частота: <strong>4625</strong> кГц</span>
         </div>
     </div>
 
-    <!-- WebSDR в iframe -->
-    <iframe id="websdrFrame" src="http://websdr.ewi.utwente.nl:8901/?freq=4625.00&mode=usb&volume=50" style="width:1px;height:1px;border:none;position:absolute;left:-9999px;"></iframe>
+    <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+        <button class="btn" id="playBtn">▶ Включить звук</button>
+        <button class="btn" id="stopBtn" style="display:none;">⏹ Выключить</button>
+        <button class="btn" id="micBtn">🎤 Распознавание</button>
+    </div>
 
-    <!-- ЖИВОЙ ПЕРЕВОД -->
     <div class="live-block">
         <div class="live-row">
-            <span class="label">🔊 Что сказано:</span>
+            <span class="label">📡 Статус:</span>
+            <span class="value" id="statusText2">Ожидание...</span>
+        </div>
+        <div class="live-row">
+            <span class="label">🎤 Что сказано:</span>
             <span class="value" id="liveText">Ожидание...</span>
         </div>
         <div class="live-row translation">
             <span class="label">📖 Перевод:</span>
             <span class="value" id="liveTranslation">—</span>
         </div>
-        <div class="live-row">
-            <span class="label">📟 Морзе:</span>
-            <span class="value" id="liveMorse">—</span>
-        </div>
     </div>
 
-    <!-- КНОПКИ -->
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
-        <button class="btn" id="startBtn">▶ Запустить</button>
-        <button class="btn" id="stopBtn" style="display:none;">⏹ Остановить</button>
-        <button class="btn btn-secondary" id="freqToggleBtn">📡 Частоты</button>
-    </div>
-
-    <!-- ЧАСТОТЫ (раскрывающийся список) -->
-    <div id="freqPanel" style="display:none;background:rgba(16,24,40,0.7);border:1px solid #1a2a4a;border-radius:12px;padding:12px 16px;margin-bottom:12px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <span style="color:#8b949e;font-size:0.8rem;letter-spacing:1px;">📡 Сеть частот</span>
-            <span style="color:#5a6a7a;font-size:0.7rem;">Нажмите для переключения</span>
-        </div>
-        <div class="freq-grid" id="freqGrid"></div>
-        <div id="freqInfo" class="freq-info">
-            <strong id="freqInfoName">Основная</strong><br>
-            <span id="freqInfoDesc">Главная частота УВБ-76 («Жужжалка»). Постоянно активна.</span>
-        </div>
-    </div>
-
-    <!-- ЛЕНТА ПЕРЕВОДОВ -->
-    <div style="background:rgba(16,24,40,0.7);border:1px solid #1a2a4a;border-radius:12px;padding:12px 16px;margin-bottom:12px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-            <span style="color:#8b949e;font-size:0.8rem;letter-spacing:1px;">📋 Лента переводов</span>
+    <!-- Лента переводов -->
+    <div style="background:rgba(16,24,40,0.7);border-radius:12px;padding:12px;margin-bottom:12px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+            <span style="color:#8b949e;font-size:0.8rem;">📋 Лента переводов</span>
             <span style="color:#5a6a7a;font-size:0.7rem;" id="historyCount">0</span>
         </div>
-        <div id="historyList"><div style="color:#5a6a7a;padding:8px 0;font-size:0.8rem;">Нет перехватов</div></div>
+        <div id="historyList"><div style="color:#5a6a7a;padding:8px 0;">Нет перехватов</div></div>
     </div>
 
-    <!-- ЛОГ (ТОЛЬКО ВАЖНОЕ) -->
-    <div id="log">📋 Готов. Нажмите «Запустить».</div>
-
-    <div class="footer">
-        Нейросеть активна. Данные сохраняются в Firebase. В фоне работает автономно.
-    </div>
-
+    <div id="log">📋 Готов. Нажмите «Включить звук».</div>
+    <div class="footer">Сервер на Render. Распознавание через браузер.</div>
 </div>
 
 <script>
     // ============================================
-    //  УВБ-76 ЖИВОЙ АНАЛИЗАТОР (ПОЛНАЯ ВЕРСИЯ)
-    //  + Морзе, шум, частоты, нейросеть
+    //  УВБ-76 — сайт с распознаванием через браузер
     // ============================================
 
-    // ----- СОСТОЯНИЕ -----
-    let isListening = false;
-    let currentFreq = 4625;
-    let recognition = null;
+    let ws = null;
     let audioContext = null;
-    let noiseInterval = null;
+    let isPlaying = false;
+    let recognition = null;
+    let isMicActive = false;
     let history = [];
-    let isFreqPanelOpen = false;
 
-    // ----- ЧАСТОТЫ (С ПОДРОБНЫМ ОПИСАНИЕМ) -----
-    const FREQUENCIES = [
-        { freq: 4625, name: 'Основная', desc: 'Главная частота УВБ-76 («Жужжалка»). Постоянно активна.', status: 'active' },
-        { freq: 4657, name: 'Резервная (Кавказ)', desc: 'Обнаружена в коде 0104 4657. Связана с операциями на Кавказе.', status: 'new' },
-        { freq: 2087, name: 'Резервная (Прибалтика)', desc: 'Обнаружена в коде 0104 2087. Связана с операциями в Прибалтике.', status: 'new' },
-        { freq: 5538, name: 'Скрипучее колесо', desc: 'Работает в тёмное время суток. Позывной «Альфа45».', status: 'night' },
-        { freq: 5045, name: 'Капля', desc: 'Работает в светлое время суток. Позывной «ЙВБ1».', status: 'day' },
-        { freq: 9160, name: 'Вторая гармоника', desc: 'Гармоника УВБ-76. Используется редко.', status: 'known' },
-        { freq: 8634, name: 'Запасная', desc: 'Резервный канал. Упоминается в старых перехватах.', status: 'known' },
-        { freq: 4350, name: 'Новая (2025)', desc: 'Обнаружена в сообщении «СПИДОКРАТ 0104 4350».', status: 'new' },
-        { freq: 5487, name: 'Новая (2025)', desc: 'Обнаружена в сообщении «СКИДОФОНД 0104 5487».', status: 'new' }
-    ];
-
-    // ----- СЛОВАРЬ (ПЕРЕВОД) -----
-    const DICT = {
-        "ОБЕЗЬЯНКА": { emoji: "✅", text: "Завершение операции" },
-        "МЕРЗЛЫЙ": { emoji: "🛠️", text: "Техпроверка" },
-        "ГОЛОСОК": { emoji: "🔊", text: "Активация сети" },
-        "ОКОНЧАНЬЕ": { emoji: "🔇", text: "Завершение сеанса" },
-        "НЕРЧИНСКИЙ": { emoji: "🚀", text: "РВСН" },
-        "СУПЕРМАТИЗМ": { emoji: "🎯", text: "Наведение" },
-        "ЛАТВИЯ": { emoji: "🌍", text: "Прибалтика" },
-        "КАВКАЗ": { emoji: "🌍", text: "Кавказ" },
-        "КИТАЙСКИЙ": { emoji: "🌍", text: "Китай" },
-        "0010": { emoji: "🎯", text: "Боевой приказ" },
-        "0104": { emoji: "📡", text: "Смена частоты" },
-        "0100": { emoji: "🔒", text: "Переход в резерв" },
-        "0808": { emoji: "🆔", text: "ID подразделения" }
-    };
-
-    // ----- DOM -----
     const statusDot = document.getElementById('statusDot');
     const statusText = document.getElementById('statusText');
-    const currentFreqDisplay = document.getElementById('currentFreqDisplay');
+    const statusText2 = document.getElementById('statusText2');
     const liveText = document.getElementById('liveText');
     const liveTranslation = document.getElementById('liveTranslation');
-    const liveMorse = document.getElementById('liveMorse');
-    const noiseLevel = document.getElementById('noiseLevel');
     const logDiv = document.getElementById('log');
     const historyList = document.getElementById('historyList');
     const historyCount = document.getElementById('historyCount');
-    const freqGrid = document.getElementById('freqGrid');
-    const freqInfo = document.getElementById('freqInfo');
-    const freqInfoName = document.getElementById('freqInfoName');
-    const freqInfoDesc = document.getElementById('freqInfoDesc');
-    const startBtn = document.getElementById('startBtn');
+    const playBtn = document.getElementById('playBtn');
     const stopBtn = document.getElementById('stopBtn');
-    const freqToggleBtn = document.getElementById('freqToggleBtn');
-    const freqPanel = document.getElementById('freqPanel');
+    const micBtn = document.getElementById('micBtn');
 
-    // ----- ЛОГ (ТОЛЬКО ВАЖНОЕ) -----
-    function log(msg, type = 'info') {
-        const time = new Date().toTimeString().slice(0, 8);
-        const cls = type === 'ok' ? 'ok' : type === 'err' ? 'err' : type === 'morse' ? 'morse' : type === 'noise' ? 'noise' : 'info';
-        // Показываем только важное
-        if (type === 'info' && msg.includes('Распознавание')) return;
-        logDiv.innerHTML += `<div class="${cls}">[${time}] ${msg}</div>`;
-        logDiv.scrollTop = logDiv.scrollHeight;
-        // Ограничиваем количество строк
-        const lines = logDiv.children;
-        while (lines.length > 50) lines[0].remove();
-    }
+    const SERVER_URL = 'wss://redloguna.onrender.com';
 
-    // ----- ПЕРЕВОД -----
+    // ----- СЛОВАРЬ -----
+    const DICT = {
+        "ОБЕЗЬЯНКА": "✅ Завершение операции",
+        "МЕРЗЛЫЙ": "🛠️ Техпроверка",
+        "ГОЛОСОК": "🔊 Активация сети",
+        "ОКОНЧАНЬЕ": "🔇 Завершение сеанса",
+        "НЕРЧИНСКИЙ": "🚀 РВСН",
+        "СУПЕРМАТИЗМ": "🎯 Наведение",
+        "ЛАТВИЯ": "🌍 Прибалтика",
+        "КАВКАЗ": "🌍 Кавказ",
+        "КИТАЙСКИЙ": "🌍 Китай",
+        "0010": "🎯 Боевой приказ",
+        "0104": "📡 Смена частоты"
+    };
+
     function translate(text) {
-        const words = text.split(/\s+/);
-        for (const word of words) {
-            const clean = word.replace(/[^а-яА-Я0-9]/g, '').toUpperCase();
-            if (DICT[clean]) {
-                return `${DICT[clean].emoji} ${DICT[clean].text}`;
+        for (const [key, value] of Object.entries(DICT)) {
+            if (text.toUpperCase().includes(key)) {
+                return value;
             }
-        }
-        if (text.includes('0010')) {
-            return '🎯 Боевой приказ (координаты)';
-        }
-        if (text.includes('0104')) {
-            const freq = text.match(/\b(\d{4})\b/);
-            if (freq) return `📡 Смена частоты → ${freq[1]} кГц`;
-            return '📡 Смена частоты';
         }
         return '📻 Неизвестно';
     }
 
-    // ----- ИСТОРИЯ (сохраняется в localStorage) -----
+    // ----- ИСТОРИЯ -----
     function addHistory(text, translation) {
         const now = new Date();
         const time = now.toTimeString().slice(0, 8);
         history.unshift({ time, text, translation });
         if (history.length > 50) history.pop();
-        localStorage.setItem('uvb_history', JSON.stringify(history));
         renderHistory();
     }
 
     function renderHistory() {
         if (history.length === 0) {
-            historyList.innerHTML = '<div style="color:#5a6a7a;padding:8px 0;font-size:0.8rem;">Нет перехватов</div>';
+            historyList.innerHTML = '<div style="color:#5a6a7a;padding:8px 0;">Нет перехватов</div>';
             historyCount.textContent = '0';
             return;
         }
@@ -258,147 +162,24 @@
         historyCount.textContent = history.length;
     }
 
-    // Загружаем историю
-    try {
-        const saved = JSON.parse(localStorage.getItem('uvb_history') || '[]');
-        history = saved;
-        renderHistory();
-    } catch (e) {}
-
-    // ----- ФОРМАТИРОВАНИЕ МОРЗЕ -----
-    let morseBuffer = '';
-    let morseTimer = null;
-
-    function processMorse(signal) {
-        if (signal === '.') {
-            morseBuffer += '.';
-        } else if (signal === '-') {
-            morseBuffer += '-';
-        } else if (signal === ' ') {
-            if (morseBuffer) {
-                liveMorse.textContent = `📟 ${morseBuffer}`;
-                log(`📟 Морзе: ${morseBuffer}`, 'morse');
-                morseBuffer = '';
-            }
-        }
-        clearTimeout(morseTimer);
-        morseTimer = setTimeout(() => {
-            if (morseBuffer) {
-                liveMorse.textContent = `📟 ${morseBuffer}`;
-                log(`📟 Морзе: ${morseBuffer}`, 'morse');
-                morseBuffer = '';
-            }
-        }, 1000);
+    // ----- ЛОГ -----
+    function log(msg, type = 'info') {
+        const time = new Date().toTimeString().slice(0, 8);
+        const cls = type === 'ok' ? 'ok' : type === 'err' ? 'err' : 'info';
+        logDiv.innerHTML += `<div class="${cls}">[${time}] ${msg}</div>`;
+        logDiv.scrollTop = logDiv.scrollHeight;
     }
 
-    // ----- АНАЛИЗ ШУМА -----
-    let noiseValue = 0;
-
-    function analyzeNoise(dataArray) {
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-            sum += dataArray[i];
-        }
-        const avg = sum / (dataArray.length * 255);
-        noiseValue = Math.round(avg * 100);
-        noiseLevel.textContent = noiseValue;
-        if (noiseValue > 70) {
-            statusDot.className = 'status-dot warning';
-        } else if (noiseValue > 90) {
-            statusDot.className = 'status-dot error';
-        } else {
-            statusDot.className = 'status-dot active';
-        }
-        // Логируем только сильные изменения
-        if (noiseValue > 80) {
-            log(`🔊 Высокий шум: ${noiseValue}%`, 'noise');
-        }
-    }
-
-    // ----- НЕЙРОСЕТЬ (ПРОСТОЙ КЛАССИФИКАТОР) -----
-    // Используем эвристический алгоритм с самообучением
-    let neuralMemory = {};
-
-    function neuralClassify(text) {
-        const words = text.split(/\s+/);
-        let bestMatch = null;
-        let bestScore = 0;
-
-        for (const word of words) {
-            const clean = word.replace(/[^а-яА-Я0-9]/g, '').toUpperCase();
-            // Проверяем словарь
-            if (DICT[clean]) {
-                const score = 0.9;
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestMatch = DICT[clean];
-                }
-            }
-            // Проверяем память нейросети
-            if (neuralMemory[clean]) {
-                const score = neuralMemory[clean].confidence || 0.5;
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestMatch = neuralMemory[clean];
-                }
-            }
-        }
-
-        // Если нашли в памяти — возвращаем
-        if (bestMatch && bestScore > 0.5) {
-            return `${bestMatch.emoji} ${bestMatch.text}`;
-        }
-
-        // Ищем коды
-        if (text.includes('0010')) return '🎯 Боевой приказ (координаты)';
-        if (text.includes('0104')) {
-            const freq = text.match(/\b(\d{4})\b/);
-            if (freq) return `📡 Смена частоты → ${freq[1]} кГц`;
-            return '📡 Смена частоты';
-        }
-
-        return '📻 Неизвестно';
-    }
-
-    // Обучение нейросети (запоминает новые слова)
-    function neuralLearn(word, translation) {
-        const clean = word.replace(/[^а-яА-Я0-9]/g, '').toUpperCase();
-        if (!DICT[clean]) {
-            if (!neuralMemory[clean]) {
-                neuralMemory[clean] = { text: translation, confidence: 0.3, count: 0 };
-            }
-            neuralMemory[clean].count++;
-            neuralMemory[clean].confidence = Math.min(0.9, 0.3 + neuralMemory[clean].count * 0.05);
-            // Сохраняем в localStorage
-            try {
-                localStorage.setItem('neural_memory', JSON.stringify(neuralMemory));
-            } catch (e) {}
-        }
-    }
-
-    // Загружаем память нейросети
-    try {
-        const saved = JSON.parse(localStorage.getItem('neural_memory') || '{}');
-        neuralMemory = saved;
-    } catch (e) {}
-
-    // ----- РАСПОЗНАВАНИЕ РЕЧИ -----
+    // ----- РАСПОЗНАВАНИЕ РЕЧИ (БРАУЗЕР) -----
     function initRecognition() {
         if (!('webkitSpeechRecognition' in window)) {
-            log('❌ Браузер не поддерживает распознавание речи', 'err');
-            return false;
+            log('❌ Браузер не поддерживает распознавание', 'err');
+            return;
         }
-
         recognition = new webkitSpeechRecognition();
         recognition.lang = 'ru-RU';
         recognition.continuous = true;
         recognition.interimResults = true;
-
-        recognition.onstart = function() {
-            statusDot.className = 'status-dot active';
-            statusText.textContent = '🎤 Активен';
-            // Не логируем каждый раз
-        };
 
         recognition.onresult = function(event) {
             for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -406,20 +187,11 @@
                 if (result.isFinal) {
                     const text = result[0].transcript.trim();
                     if (text.length > 2) {
+                        const translation = translate(text);
                         liveText.textContent = text;
-                        // Нейросеть переводит
-                        const translation = neuralClassify(text);
                         liveTranslation.textContent = translation;
-                        // Обучаем нейросеть
-                        if (translation !== '📻 Неизвестно') {
-                            const words = text.split(/\s+/);
-                            for (const word of words) {
-                                neuralLearn(word, translation);
-                            }
-                        }
                         addHistory(text, translation);
-                        // Логируем только переводы
-                        log(`🎤 "${text}" → 📖 ${translation}`, 'ok');
+                        log(`🎤 "${text}" → ${translation}`, 'ok');
                     }
                 } else {
                     const text = result[0].transcript.trim();
@@ -434,216 +206,121 @@
             if (e.error === 'not-allowed') {
                 log('❌ Нет доступа к микрофону', 'err');
             }
-            setTimeout(() => {
-                if (isListening) {
-                    try { recognition.start(); } catch (e) {}
-                }
-                }, 2000);
+            isMicActive = false;
+            micBtn.textContent = '🎤 Распознавание';
+            micBtn.style.background = '#1f6feb';
         };
 
         recognition.onend = function() {
-            if (isListening) {
+            if (isMicActive) {
                 try { recognition.start(); } catch (e) {}
             }
         };
-
-        return true;
     }
 
-    // ----- АНАЛИЗАТОР МОРЗЕ И ШУМА -----
-    function initAudioAnalyzer() {
-        try {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const analyser = audioContext.createAnalyser();
-            analyser.fftSize = 512;
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-            navigator.mediaDevices.getUserMedia({ audio: true, video: false })
-                .then(stream => {
-                    const source = audioContext.createMediaStreamSource(stream);
-                    source.connect(analyser);
-
-                    let lastMorseState = false;
-                    let silenceCount = 0;
-
-                    function analyze() {
-                        analyser.getByteFrequencyData(dataArray);
-                        analyzeNoise(dataArray);
-
-                        // Детектор Морзе (тон 800-1200 Гц)
-                        let sum = 0;
-                        for (let i = 0; i < dataArray.length; i++) {
-                            const freq = i * (audioContext.sampleRate / 2) / dataArray.length;
-                            if (freq > 800 && freq < 1200) sum += dataArray[i];
-                        }
-                        const isTone = sum > 3000;
-
-                        if (isTone && !lastMorseState) {
-                            // Начало сигнала
-                            silenceCount = 0;
-                        } else if (!isTone && lastMorseState) {
-                            // Конец сигнала
-                            const duration = silenceCount;
-                            if (duration < 5) {
-                                processMorse('.');
-                            } else if (duration < 15) {
-                                processMorse('-');
-                            } else {
-                                processMorse(' ');
-                            }
-                            silenceCount = 0;
-                        }
-
-                        if (!isTone) {
-                            silenceCount++;
-                        }
-
-                        lastMorseState = isTone;
-
-                        // Обновляем статус Морзе в UI
-                        if (isTone) {
-                            liveMorse.textContent = '📟 Сигнал...';
-                        }
-
-                        requestAnimationFrame(analyze);
-                    }
-                    analyze();
-                    log('✅ Анализатор Морзе и шума запущен', 'ok');
-                })
-                .catch(() => {
-                    log('⚠️ Нет доступа к микрофону для анализа', 'warn');
-                });
-        } catch (e) {
-            log('⚠️ Audio API не поддерживается', 'warn');
+    function toggleMic() {
+        if (!recognition) {
+            initRecognition();
+            if (!recognition) return;
         }
-    }
-
-    // ----- ЧАСТОТЫ (список) -----
-    function renderFrequencies() {
-        freqGrid.innerHTML = '';
-        FREQUENCIES.forEach(f => {
-            const btn = document.createElement('button');
-            btn.className = 'freq-btn';
-            if (f.freq === currentFreq) btn.classList.add('current');
-            btn.dataset.freq = f.freq;
-            const statusEmoji = f.status === 'active' ? '🟢' : f.status === 'new' ? '🆕' : f.status === 'night' ? '🌙' : f.status === 'day' ? '☀️' : '📡';
-            btn.innerHTML = `${f.freq} кГц ${statusEmoji}`;
-            btn.title = f.name + ': ' + f.desc;
-            btn.addEventListener('click', () => switchFreq(f.freq));
-            freqGrid.appendChild(btn);
-        });
-        // Показываем информацию о текущей частоте
-        showFreqInfo(currentFreq);
-    }
-
-    function showFreqInfo(freq) {
-        const f = FREQUENCIES.find(f => f.freq === freq);
-        if (!f) return;
-        freqInfoName.textContent = f.name;
-        freqInfoDesc.textContent = f.desc;
-        freqInfo.classList.add('visible');
-    }
-
-    function switchFreq(freq) {
-        currentFreq = freq;
-        currentFreqDisplay.textContent = freq;
-        // Обновляем iframe WebSDR
-        const iframe = document.getElementById('websdrFrame');
-        iframe.src = `http://websdr.ewi.utwente.nl:8901/?freq=${freq}.00&mode=usb&volume=50`;
-        // Обновляем кнопки
-        document.querySelectorAll('.freq-btn').forEach(b => {
-            b.classList.remove('current');
-            if (parseInt(b.dataset.freq) === freq) b.classList.add('current');
-        });
-        showFreqInfo(freq);
-        log(`📡 Переключено на ${freq} кГц`, 'info');
-    }
-
-    // ----- ЗАПУСК / ОСТАНОВКА -----
-    function startListening() {
-        if (isListening) return;
-
-        log('🚀 Запуск...', 'info');
-
-        const ok = initRecognition();
-        if (!ok) {
-            log('❌ Ошибка запуска', 'err');
-            return;
-        }
-
-        initAudioAnalyzer();
-
-        isListening = true;
-        statusDot.className = 'status-dot active';
-        statusText.textContent = '🎤 Активен';
-        try { recognition.start(); } catch (e) {}
-
-        startBtn.style.display = 'none';
-        stopBtn.style.display = 'inline-block';
-
-        log('✅ Активен. Голос → перевод, Морзе → декодинг.', 'ok');
-    }
-
-    function stopListening() {
-        isListening = false;
-        if (recognition) {
+        if (isMicActive) {
+            isMicActive = false;
             try { recognition.stop(); } catch (e) {}
+            micBtn.textContent = '🎤 Распознавание';
+            micBtn.style.background = '#1f6feb';
+            log('⏹ Распознавание остановлено', 'info');
+        } else {
+            isMicActive = true;
+            try { recognition.start(); } catch (e) {}
+            micBtn.textContent = '🔴 Слушаю...';
+            micBtn.style.background = '#ff6b6b';
+            log('🎤 Распознавание запущено', 'ok');
         }
-        statusDot.className = 'status-dot';
-        statusText.textContent = 'Остановлен';
-        startBtn.style.display = 'inline-block';
-        stopBtn.style.display = 'none';
-        log('⏹ Остановлен', 'warn');
     }
 
-    // ----- ЧАСЫ -----
-    function updateClock() {
-        const now = new Date();
-        const msk = new Date(now.getTime() + (3 * 60 * 60 * 1000));
-        document.getElementById('clock').textContent = msk.toISOString().slice(11, 16) + ' MSK';
+    // ----- WEBSOCKET (ПОДКЛЮЧЕНИЕ К СЕРВЕРУ) -----
+    function connectWebSocket() {
+        ws = new WebSocket(SERVER_URL);
+        ws.onopen = function() {
+            statusDot.className = 'status-dot active';
+            statusText.textContent = '✅ Подключено';
+            statusText2.textContent = '✅ Сервер';
+            log('✅ Подключено к серверу', 'ok');
+        };
+        ws.onmessage = function(event) {
+            if (event.data instanceof Blob && isPlaying) {
+                playAudio(event.data);
+            }
+        };
+        ws.onerror = function() {
+            statusDot.className = 'status-dot';
+            statusText.textContent = '❌ Ошибка';
+            log('❌ Ошибка сервера', 'err');
+        };
+        ws.onclose = function() {
+            statusDot.className = 'status-dot';
+            statusText.textContent = '⚠️ Отключено';
+            log('⚠️ Отключено, переподключение...', 'warn');
+            setTimeout(connectWebSocket, 5000);
+        };
     }
-    setInterval(updateClock, 1000);
-    updateClock();
 
-    // ----- FREQ PANEL -----
-    freqToggleBtn.addEventListener('click', () => {
-        isFreqPanelOpen = !isFreqPanelOpen;
-        freqPanel.style.display = isFreqPanelOpen ? 'block' : 'none';
-        freqToggleBtn.textContent = isFreqPanelOpen ? '📡 Скрыть частоты' : '📡 Частоты';
-    });
+    // ----- АУДИО -----
+    function playAudio(data) {
+        try {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const arrayBuffer = e.target.result;
+                audioContext.decodeAudioData(arrayBuffer, function(buffer) {
+                    const source = audioContext.createBufferSource();
+                    source.buffer = buffer;
+                    source.connect(audioContext.destination);
+                    source.start(0);
+                });
+            };
+            reader.readAsArrayBuffer(data);
+        } catch (e) {}
+    }
 
     // ----- КНОПКИ -----
-    startBtn.addEventListener('click', startListening);
-    stopBtn.addEventListener('click', stopListening);
-
-    // ----- ИНИЦИАЛИЗАЦИЯ -----
-    renderFrequencies();
-    log('📋 Готов. Нажмите «Запустить».', 'info');
-    log('🧠 Нейросеть активна. Обучается на новых словах.', 'info');
-
-    // Фоновое прослушивание (Service Worker не реализован, но данные сохраняются)
-    // Добавляем периодическое сохранение состояния
-    setInterval(() => {
-        // Сохраняем историю
-        localStorage.setItem('uvb_history', JSON.stringify(history));
-    }, 30000);
-
-    // ---- СЛЕЖЕНИЕ ЗА ФОНОМ (для телефона) ----
-    // Используем Page Visibility API для перезапуска при возврате
-    document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && isListening) {
-            // Если вкладка стала видимой и мы слушаем — перезапускаем
-            try {
-                if (recognition) recognition.start();
-            } catch (e) {}
-            log('🔄 Возврат в активный режим', 'info');
+    playBtn.onclick = function() {
+        isPlaying = true;
+        playBtn.style.display = 'none';
+        stopBtn.style.display = 'inline-block';
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
-    });
+        log('🔊 Звук включён', 'ok');
+    };
 
-    console.log('🦇 УВБ-76 Живой анализатор запущен');
-    console.log('📡 Текущая частота:', currentFreq);
-    console.log('🧠 Нейросеть загружена, слов в памяти:', Object.keys(neuralMemory).length);
+    stopBtn.onclick = function() {
+        isPlaying = false;
+        playBtn.style.display = 'inline-block';
+        stopBtn.style.display = 'none';
+        if (audioContext) {
+            audioContext.close();
+            audioContext = null;
+        }
+        log('🔇 Звук выключен', 'info');
+    };
+
+    micBtn.onclick = toggleMic;
+
+    // ----- ЧАСЫ -----
+    setInterval(() => {
+        const now = new Date();
+        const msk = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+        document.getElementById('clock').textContent = msk.toISOString().slice(11, 16) + ' MSK';
+    }, 1000);
+
+    // ----- ЗАПУСК -----
+    connectWebSocket();
+    log('📋 Готов. Нажмите «Включить звук» и «Распознавание».', 'info');
+    log('🌐 Адрес сервера: ' + SERVER_URL, 'info');
 </script>
 
 </body>
-</html>
+    </html>
