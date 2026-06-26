@@ -3,73 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>УВБ-76 — Анализатор</title>
+    <title>УВБ-76 — Аналитический штаб</title>
+
+    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Основные стили -->
     <link rel="stylesheet" href="style.css">
+
+    <!-- Иконка сайта -->
+    <link rel="icon" href="https://img.icons8.com/fluency/48/bat.png" type="image/png">
 </head>
 <body>
-    <div class="container">
 
-        <header>
-            <div>
-                <h1>УВБ-76 <small>Расшифровка сигналов • 2023–2026</small></h1>
-            </div>
-            <div class="clock" id="clock">--:--:-- MSK</div>
-        </header>
+<div class="container">
 
-        <!-- Статистика -->
-        <div class="stats-grid">
-            <div class="stat-item">
-                <div class="num" id="totalCount">0</div>
-                <div class="label">Всего сообщений</div>
-            </div>
-            <div class="stat-item">
-                <div class="num" id="todayCount">0</div>
-                <div class="label">Сегодня</div>
-            </div>
-            <div class="stat-item">
-                <div class="num" id="lastDate">--</div>
-                <div class="label">Последнее</div>
-            </div>
-            <div class="stat-item">
-                <div class="num" id="dictSize">0</div>
-                <div class="label">Слов в словаре</div>
-            </div>
+    <!-- ===== ШАПКА ===== -->
+    <header>
+        <div>
+            <h1>
+                🦇 УВБ-76
+                <small>Аналитический штаб</small>
+            </h1>
         </div>
+        <div class="clock" id="clock">--:--:-- MSK</div>
+    </header>
 
-        <!-- Прогноз -->
-        <div class="forecast-box">
-            <div class="title">🔮 Прогноз</div>
-            <div class="text" id="forecastText">Загрузка...</div>
+    <!-- ===== СТАТУС-БАР ===== -->
+    <div class="status-bar">
+        <div class="status-item">
+            <span class="status-dot"></span>
+            <span>Система активна</span>
         </div>
-
-        <!-- Карта -->
-        <div id="map"></div>
-
-        <!-- Таблица переводов -->
-        <div class="table-wrap">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Когда</th>
-                        <th>Кто</th>
-                        <th>Перевод</th>
-                        <th>Цифры</th>
-                    </tr>
-                </thead>
-                <tbody id="messagesBody">
-                    <tr><td colspan="4" style="text-align:center;color:#5a6a7a;">Загрузка...</td></tr>
-                </tbody>
-            </table>
+        <div class="status-item">
+            <span>📡</span>
+            <span>Станция: УВБ-76 «Жужжалка»</span>
         </div>
-
-        <div class="footer">
-            Данные перехватов из открытых источников. Карта показывает реальные объекты.
+        <div class="status-item">
+            <span>📋</span>
+            <span>Сеансов: <strong id="totalCountSmall">0</strong></span>
         </div>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="data.js"></script>
-    <script src="app.js"></script>
-</body>
-    </html>
+    <!-- ===== СТАТИСТИКА ===== -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="num" id="totalCount">0</div>
+            <div class="label">Всего сообщений</div>
+        </div>
+        <div class="stat-card">
+            <div class="num" id="todayCount">0</div>
+            <div class="label">Сегодня</div>
+        </div>
+        <div class="stat-card">
+            <div class="num" id="lastDate">--</div>
+            <div class="label">Последнее</div>
+        </div>
+        <div class="stat-card">
+            <div class="num" id="dictSize">0</div>
+            <div class="label">Слов в словаре</div>
+        </div>
+    </div>
+
+    <!-- ===== ПРОГНОЗ ===== -->
+    <div class="stat-card" style="margin-bottom:24px;text-align:left;padding:16px 20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <div>
+                <span style="font-size:1.4rem;margin-right:10px;">🔮</span>
+                <span style="font-weight:600;color:#f0e6d0;">Прогноз активности</span>
+            </div>
+            <button id="refreshForecast" style="background:rgba(26,42,74,0.6);border:1px solid #1a2a4a;border-radius:20px;padding:6px 16px;color:#c8d6e5;cursor:pointer;font-family:inherit;font-size:0.8rem;">
+                Обновить
+            </button>
+        </div>
+        <
