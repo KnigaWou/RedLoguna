@@ -1,33 +1,47 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>УВБ-76 — Живой приёмник</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0a0e17; color: #c8d6e5; font-family: monospace; padding: 16px; }
-        .container { max-width: 900px; margin: 0 auto; }
+        body { background: #0a0e17; color: #c8d6e5; font-family: 'Segoe UI', monospace; padding: 16px; }
+        .container { max-width: 800px; margin: 0 auto; }
         header { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; background: rgba(16,24,40,0.85); border: 1px solid #1a2a4a; border-radius: 12px; margin-bottom: 16px; }
-        header h1 { font-size: 1.5rem; color: #58a6ff; }
-        .clock { font-size: 1.1rem; color: #f0e6d0; }
-        .status-bar { display: flex; gap: 20px; flex-wrap: wrap; padding: 10px 16px; background: rgba(16,24,40,0.6); border: 1px solid #1a2a4a; border-radius: 10px; margin-bottom: 16px; }
-        .status-item { display: flex; align-items: center; gap: 8px; }
-        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #555; }
+        header h1 { font-size: 1.3rem; color: #58a6ff; }
+        header h1 small { font-size: 0.7rem; color: #8b949e; }
+        .clock { font-size: 1rem; color: #f0e6d0; }
+        .status-bar { display: flex; gap: 16px; flex-wrap: wrap; padding: 8px 14px; background: rgba(16,24,40,0.6); border: 1px solid #1a2a4a; border-radius: 10px; margin-bottom: 12px; }
+        .status-item { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
         .status-dot.active { background: #00ff88; box-shadow: 0 0 15px #00ff88; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-        .live-block { background: rgba(16,24,40,0.8); border: 1px solid #1a2a4a; border-radius: 12px; padding: 14px 18px; margin-bottom: 16px; }
-        .live-row { display: flex; gap: 12px; padding: 4px 0; font-size: 1rem; flex-wrap: wrap; }
-        .live-row .label { color: #8b949e; min-width: 120px; }
-        .live-row .value { color: #f0e6d0; }
-        .live-row.translation .value { color: #58a6ff; font-weight: 600; }
-        .btn { background: #1f6feb; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 0.9rem; cursor: pointer; }
+        .btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+        .btn { background: #1f6feb; color: white; border: none; padding: 8px 18px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; }
         .btn:hover { background: #58a6ff; }
-        #log { margin-top: 10px; background: #161b22; padding: 10px; border-radius: 8px; font-size: 0.8rem; max-height: 150px; overflow-y: auto; color: #8b949e; }
-        .footer { text-align: center; color: #3a4a6a; font-size: 0.7rem; padding: 12px 0; border-top: 1px solid #1a2a4a; margin-top: 16px; }
+        .btn-danger { background: #ff6b6b; }
+        .btn-danger:hover { background: #ff4757; }
+        .btn-success { background: #2ed573; }
+        .btn-success:hover { background: #7bed9f; }
+        .btn-secondary { background: rgba(26,42,74,0.6); border: 1px solid #1a2a4a; }
+        .btn-secondary:hover { border-color: #58a6ff; }
+        .live-block { background: rgba(16,24,40,0.8); border: 1px solid #1a2a4a; border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; }
+        .live-row { display: flex; gap: 10px; padding: 3px 0; font-size: 0.9rem; flex-wrap: wrap; }
+        .live-row .label { color: #8b949e; min-width: 100px; font-size: 0.8rem; }
+        .live-row .value { color: #f0e6d0; word-break: break-word; flex: 1; }
+        .live-row.translation .value { color: #58a6ff; font-weight: 600; }
+        .history { background: rgba(16,24,40,0.7); border: 1px solid #1a2a4a; border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; }
+        .history h3 { color: #8b949e; font-weight: 400; letter-spacing: 2px; font-size: 0.7rem; margin-bottom: 8px; }
         .history-item { display: flex; gap: 10px; padding: 4px 0; border-bottom: 1px solid rgba(26,42,74,0.2); font-size: 0.8rem; }
         .history-item .time { color: #5a6a7a; min-width: 60px; }
         .history-item .text { color: #c8d6e5; flex: 1; }
         .history-item .trans { color: #58a6ff; font-weight: 500; }
+        #log { background: #161b22; padding: 10px; border-radius: 8px; font-size: 0.75rem; max-height: 120px; overflow-y: auto; color: #5a6a7a; }
+        #log .ok { color: #6bcb77; }
+        #log .err { color: #ff6b6b; }
+        #log .info { color: #ffd93d; }
+        .footer { text-align: center; color: #3a4a6a; font-size: 0.65rem; padding: 12px 0; border-top: 1px solid #1a2a4a; margin-top: 12px; }
     </style>
 </head>
 <body>
@@ -45,14 +59,19 @@
         </div>
         <div class="status-item">
             <span>📡</span>
-            <span>Частота: <strong>4625</strong> кГц</span>
+            <span>4625 кГц</span>
+        </div>
+        <div class="status-item">
+            <span>🎤</span>
+            <span id="micStatus">Выкл</span>
         </div>
     </div>
 
-    <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
-        <button class="btn" id="playBtn">▶ Включить звук</button>
-        <button class="btn" id="stopBtn" style="display:none;">⏹ Выключить</button>
+    <div class="btn-group">
+        <button class="btn btn-success" id="playBtn">▶ Звук</button>
+        <button class="btn btn-danger" id="stopBtn" style="display:none;">⏹ Стоп</button>
         <button class="btn" id="micBtn">🎤 Распознавание</button>
+        <button class="btn btn-secondary" id="reconnectBtn">🔄</button>
     </div>
 
     <div class="live-block">
@@ -70,22 +89,21 @@
         </div>
     </div>
 
-    <!-- Лента переводов -->
-    <div style="background:rgba(16,24,40,0.7);border-radius:12px;padding:12px;margin-bottom:12px;">
-        <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-            <span style="color:#8b949e;font-size:0.8rem;">📋 Лента переводов</span>
-            <span style="color:#5a6a7a;font-size:0.7rem;" id="historyCount">0</span>
-        </div>
-        <div id="historyList"><div style="color:#5a6a7a;padding:8px 0;">Нет перехватов</div></div>
+    <div class="history">
+        <h3>📋 Лента переводов</h3>
+        <div id="historyList"><div style="color:#5a6a7a;padding:8px 0;font-size:0.8rem;">Нет перехватов</div></div>
     </div>
 
-    <div id="log">📋 Готов. Нажмите «Включить звук».</div>
-    <div class="footer">Сервер на Render. Распознавание через браузер.</div>
+    <div id="log">📋 Готов. Нажмите «Звук» и «Распознавание».</div>
+
+    <div class="footer">
+        Сервер: redloguna.onrender.com · Распознавание через браузер
+    </div>
 </div>
 
 <script>
     // ============================================
-    //  УВБ-76 — сайт с распознаванием через браузер
+    //  УВБ-76 — Живой приёмник (ФИНАЛ)
     // ============================================
 
     let ws = null;
@@ -102,10 +120,11 @@
     const liveTranslation = document.getElementById('liveTranslation');
     const logDiv = document.getElementById('log');
     const historyList = document.getElementById('historyList');
-    const historyCount = document.getElementById('historyCount');
     const playBtn = document.getElementById('playBtn');
     const stopBtn = document.getElementById('stopBtn');
     const micBtn = document.getElementById('micBtn');
+    const reconnectBtn = document.getElementById('reconnectBtn');
+    const micStatus = document.getElementById('micStatus');
 
     const SERVER_URL = 'wss://redloguna.onrender.com';
 
@@ -145,7 +164,6 @@
     function renderHistory() {
         if (history.length === 0) {
             historyList.innerHTML = '<div style="color:#5a6a7a;padding:8px 0;">Нет перехватов</div>';
-            historyCount.textContent = '0';
             return;
         }
         let html = '';
@@ -159,7 +177,6 @@
             `;
         });
         historyList.innerHTML = html;
-        historyCount.textContent = history.length;
     }
 
     // ----- ЛОГ -----
@@ -170,7 +187,7 @@
         logDiv.scrollTop = logDiv.scrollHeight;
     }
 
-    // ----- РАСПОЗНАВАНИЕ РЕЧИ (БРАУЗЕР) -----
+    // ----- РАСПОЗНАВАНИЕ -----
     function initRecognition() {
         if (!('webkitSpeechRecognition' in window)) {
             log('❌ Браузер не поддерживает распознавание', 'err');
@@ -208,7 +225,8 @@
             }
             isMicActive = false;
             micBtn.textContent = '🎤 Распознавание';
-            micBtn.style.background = '#1f6feb';
+            micBtn.className = 'btn';
+            micStatus.textContent = 'Выкл';
         };
 
         recognition.onend = function() {
@@ -227,42 +245,48 @@
             isMicActive = false;
             try { recognition.stop(); } catch (e) {}
             micBtn.textContent = '🎤 Распознавание';
-            micBtn.style.background = '#1f6feb';
+            micBtn.className = 'btn';
+            micStatus.textContent = 'Выкл';
             log('⏹ Распознавание остановлено', 'info');
         } else {
             isMicActive = true;
             try { recognition.start(); } catch (e) {}
             micBtn.textContent = '🔴 Слушаю...';
-            micBtn.style.background = '#ff6b6b';
+            micBtn.className = 'btn btn-danger';
+            micStatus.textContent = 'Вкл';
             log('🎤 Распознавание запущено', 'ok');
         }
     }
 
-    // ----- WEBSOCKET (ПОДКЛЮЧЕНИЕ К СЕРВЕРУ) -----
+    // ----- WEBSOCKET -----
     function connectWebSocket() {
-        ws = new WebSocket(SERVER_URL);
-        ws.onopen = function() {
-            statusDot.className = 'status-dot active';
-            statusText.textContent = '✅ Подключено';
-            statusText2.textContent = '✅ Сервер';
-            log('✅ Подключено к серверу', 'ok');
-        };
-        ws.onmessage = function(event) {
-            if (event.data instanceof Blob && isPlaying) {
-                playAudio(event.data);
-            }
-        };
-        ws.onerror = function() {
-            statusDot.className = 'status-dot';
-            statusText.textContent = '❌ Ошибка';
-            log('❌ Ошибка сервера', 'err');
-        };
-        ws.onclose = function() {
-            statusDot.className = 'status-dot';
-            statusText.textContent = '⚠️ Отключено';
-            log('⚠️ Отключено, переподключение...', 'warn');
-            setTimeout(connectWebSocket, 5000);
-        };
+        try {
+            ws = new WebSocket(SERVER_URL);
+            ws.onopen = function() {
+                statusDot.className = 'status-dot active';
+                statusText.textContent = '✅ Подключено';
+                statusText2.textContent = '✅ Сервер';
+                log('✅ Подключено к серверу', 'ok');
+            };
+            ws.onmessage = function(event) {
+                if (event.data instanceof Blob && isPlaying) {
+                    playAudio(event.data);
+                }
+            };
+            ws.onerror = function() {
+                statusDot.className = 'status-dot';
+                statusText.textContent = '❌ Ошибка';
+                log('❌ Ошибка сервера', 'err');
+            };
+            ws.onclose = function() {
+                statusDot.className = 'status-dot';
+                statusText.textContent = '⚠️ Отключено';
+                log('⚠️ Отключено, переподключение...', 'warn');
+                setTimeout(connectWebSocket, 5000);
+            };
+        } catch (e) {
+            log('❌ Ошибка подключения: ' + e.message, 'err');
+        }
     }
 
     // ----- АУДИО -----
@@ -279,6 +303,8 @@
                     source.buffer = buffer;
                     source.connect(audioContext.destination);
                     source.start(0);
+                }, function(e) {
+                    // Если не удалось декодировать — игнорируем
                 });
             };
             reader.readAsArrayBuffer(data);
@@ -309,6 +335,12 @@
 
     micBtn.onclick = toggleMic;
 
+    reconnectBtn.onclick = function() {
+        if (ws) ws.close();
+        setTimeout(connectWebSocket, 500);
+        log('🔄 Переподключение...', 'info');
+    };
+
     // ----- ЧАСЫ -----
     setInterval(() => {
         const now = new Date();
@@ -318,9 +350,9 @@
 
     // ----- ЗАПУСК -----
     connectWebSocket();
-    log('📋 Готов. Нажмите «Включить звук» и «Распознавание».', 'info');
-    log('🌐 Адрес сервера: ' + SERVER_URL, 'info');
+    log('📋 Готов. Нажмите «Звук» и «Распознавание».', 'info');
+    log('🌐 Сервер: ' + SERVER_URL, 'info');
 </script>
 
 </body>
-    </html>
+                </html>
