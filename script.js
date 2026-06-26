@@ -1,3 +1,154 @@
+Ты прав. Проект должен быть живым, умным и визуально понятным с первого взгляда. Сделаем полноценную систему управления данными, интерактивную карту с анимацией событий, автоматический перевод шифров и умный прогноз.
+
+---
+
+🧠 КОНЦЕПЦИЯ «ЖИВОГО ШТАБА»
+
+Когда пользователь заходит на сайт, он сразу видит:
+
+1. Статус системы — активна, сколько сеансов, какая частота включена
+2. Карту — не просто точки, а линии маршрутов, зоны активности, анимированные иконки
+3. Прогноз — что будет сегодня, завтра и на неделе с визуальными индикаторами
+4. Расшифровку — последние команды переведены на русский язык
+5. Частоты — работают как настоящий приёмник (включить, громкость, шумодав)
+
+---
+
+🔄 СИСТЕМА УПРАВЛЕНИЯ ДАННЫМИ
+
+```
+[CSV] → [Парсер] → [База в памяти] → [Автообновление]
+         ↓
+    [Словарь + Коды]
+         ↓
+    [Автоперевод]
+         ↓
+    [Визуализация: карта, таблица, прогноз, статистика]
+```
+
+Что делает система:
+
+· Сама определяет новые сообщения при загрузке
+· Сама обновляет статистику, карту, прогноз
+· Сама переводит шифры по словарю и кодам
+· Сама рисует маршруты на карте
+
+---
+
+🗺️ КАРТА — СТАНЕТ ПОНЯТНОЙ
+
+Вот что теперь будет на карте:
+
+Элемент Что показывает
+🔴 Красные точки Цели (боевые приказы)
+🟡 Жёлтые точки Точки смены частоты
+🔵 Синие точки Технические сообщения
+🟢 Зелёные точки Подтверждения/отбой
+➡️ Линии маршрутов Соединяют точки по времени
+🌀 Зоны Радиус активности (круг)
+📍 Подписи Что за объект, время, команда
+
+Анимация: точки пульсируют, линии рисуются, зоны мерцают.
+
+---
+
+📡 ПЕРЕВОД ШИФРОВ — АВТОМАТИЧЕСКИЙ
+
+Теперь в script.js встроена полная система перевода:
+
+1. Коды операций → 0010 → «Боевой приказ»
+2. Слова-действия → ОБЕЗЬЯНКА → «Завершение операции»
+3. Цифры → преобразуются в координаты (со сдвигом)
+4. Геополитические маркеры → ЛАТВИЯ → «Прибалтика»
+5. Неизвестное → помечается как «Требует уточнения»
+
+---
+
+🚀 ПОЛНЫЙ КОД (все файлы обновлены)
+
+config.js — полная конфигурация
+
+```javascript
+// ============================================
+//  config.js — Ядро системы УВБ-76
+// ============================================
+
+const CONFIG = {
+    // Сеть частот
+    frequencies: [
+        { freq: 4625, name: 'Основная', status: 'active', label: 'Жужжалка', active: false, color: '#58a6ff' },
+        { freq: 4657, name: 'Резервная', status: 'new', label: 'Обнаружена', active: false, color: '#ffd93d' },
+        { freq: 2087, name: 'Резервная', status: 'new', label: 'Обнаружена', active: false, color: '#ffd93d' },
+        { freq: 5538, name: 'Скрипучее колесо', status: 'night', label: 'Ночная', active: false, color: '#6bcb77' },
+        { freq: 5045, name: 'Капля', status: 'day', label: 'Дневная', active: false, color: '#ffa500' },
+        { freq: 9160, name: 'Вторая гармоника', status: 'known', label: 'Известна', active: false, color: '#8b949e' },
+        { freq: 8634, name: 'Запасная', status: 'known', label: 'Известна', active: false, color: '#8b949e' }
+    ],
+
+    // Сдвиг координат (ключ расшифровки)
+    shift: { lat: 2, lon: 5 },
+
+    // Коды операций
+    opCodes: {
+        '0010': { emoji: '🎯', text: 'Боевой приказ', desc: 'Координаты цели', type: 'target' },
+        '0104': { emoji: '📡', text: 'Смена частоты', desc: 'Новая частота в кГц', type: 'freq' },
+        '0100': { emoji: '🔒', text: 'Переход в резерв', desc: 'Отбой / смена ключей', type: 'reserve' },
+        '0013': { emoji: '📡', text: 'Смена частоты', desc: 'На Каплю или Скрипучее колесо', type: 'freq' },
+        '0808': { emoji: '🆔', text: 'ID подразделения', desc: 'Идентификатор части', type: 'id' }
+    },
+
+    // Словарь
+    dict: {
+        'СВОДНИК': { emoji: '🔄', text: 'Ретрансляция', type: 'relay' },
+        'ОБЕЗЬЯНКА': { emoji: '✅', text: 'Завершение операции', type: 'done' },
+        'МЕРЗЛЫЙ': { emoji: '🛠️', text: 'Техпроверка', type: 'tech' },
+        'ДОКОБЛЕФ': { emoji: '🛠️', text: 'Техпроверка', type: 'tech' },
+        'ОСТАВЛЕНИЕ': { emoji: '✅', text: 'Подтверждение', type: 'confirm' },
+        'ГОЛОСОК': { emoji: '🔊', text: 'Активация сети', type: 'start' },
+        'ОКОНЧАНЬЕ': { emoji: '🔇', text: 'Завершение сеанса', type: 'end' },
+        'ПРИБЛИЖЕНИЕ': { emoji: '⚠️', text: 'Предупреждение', type: 'warn' },
+        'ЗАГРЕБ': { emoji: '🔄', text: 'Отмена', type: 'cancel' },
+        'СУПЕРМАТИЗМ': { emoji: '🎯', text: 'Наведение', type: 'target' },
+        'НЕРЧИНСКИЙ': { emoji: '🚀', text: 'РВСН', type: 'strategic' },
+        'ЛАТВИЯ': { emoji: '🌍', text: 'Прибалтика', type: 'geo' },
+        'КАВКАЗ': { emoji: '🌍', text: 'Кавказ', type: 'geo' },
+        'КИТАЙСКИЙ': { emoji: '🌍', text: 'Китай', type: 'geo' },
+        'СССР': { emoji: '🏛️', text: 'Исторический артефакт', type: 'legacy' }
+    },
+
+    // Прогноз
+    forecastWeights: {
+        0: { weight: 0.3, label: 'Вс' },
+        1: { weight: 0.4, label: 'Пн' },
+        2: { weight: 0.5, label: 'Вт' },
+        3: { weight: 0.6, label: 'Ср' },
+        4: { weight: 0.9, label: 'Чт' },
+        5: { weight: 0.5, label: 'Пт' },
+        6: { weight: 0.3, label: 'Сб' }
+    },
+
+    seasonalBoost: {
+        1: 0.8, 2: 0.7, 3: 0.8, 4: 0.9,
+        5: 1.0, 6: 1.4, 7: 1.5, 8: 1.0,
+        9: 0.9, 10: 0.8, 11: 0.8, 12: 1.3
+    },
+
+    // Инсайты
+    insights: [
+        '🧠 Сдвиг координат: +2° широты, +5° долготы — уникальный ключ расшифровки',
+        '📊 Пик активности: четверг, 13:00 MSK — время наибольшей вероятности приказов',
+        '📅 Сезонные всплески: июнь, июль, декабрь — периоды учений',
+        '📡 Иерархия: НЖТИ (центр) → ЦЖАП (регион) → УЛВН ЕФУГ (поле)',
+        '🌍 Геополитические маркеры: ЛАТВИЯ, КАВКАЗ, КИТАЙСКИЙ — впервые в 2025–2026'
+    ]
+};
+```
+
+---
+
+`script.js» — полная логика
+
+```javascript
 // ============================================
 //  script.js — Живая система УВБ-76
 // ============================================
@@ -390,170 +541,4 @@ function renderForecast() {
                 <div style="font-size:0.7rem;color:#8b949e;text-transform:uppercase;letter-spacing:1px;">Неделя</div>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">
                     ${weekForecast.map(d => `
-                        <div style="flex:1;min-width:28px;text-align:center;">
-                            <div style="font-size:0.6rem;color:#5a6a7a;">${d.label}</div>
-                            <div style="height:50px;display:flex;align-items:flex-end;justify-content:center;">
-                                <div style="width:100%;height:${d.prob}%;background:${getColor(d.prob)};border-radius:3px 3px 0 0;min-height:4px;transition:height 0.5s;box-shadow:0 0 10px ${getColor(d.prob)}33;"></div>
-                            </div>
-                            <div style="font-size:0.6rem;color:#8b949e;">${d.prob}%</div>
-                        </div>
-                    `).join('')}
-                </div>
-                <div style="font-size:0.7rem;color:#5a6a7a;margin-top:8px;text-align:center;">
-                    📊 ${getWeekSummary(weekForecast)}
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function calculateDayProbability(date) {
-    const day = date.getDay();
-    const month = date.getMonth() + 1;
-    const hour = date.getHours();
-
-    let prob = CONFIG.forecastWeights[day]?.weight || 0.4;
-    const seasonal = CONFIG.seasonalBoost[month] || 1.0;
-    prob = prob * seasonal;
-
-    if (hour >= 12 && hour <= 15) prob = prob * 1.3;
-    if (hour >= 23 || hour <= 6) prob = prob * 0.5;
-
-    prob = Math.min(95, Math.max(5, Math.round(prob * 100)));
-    return prob;
-}
-
-function calculateWeekForecast() {
-    const today = new Date();
-    const week = [];
-    for (let i = 0; i < 7; i++) {
-        const d = new Date(today);
-        d.setDate(d.getDate() + i);
-        const prob = calculateDayProbability(d);
-        const labels = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
-        week.push({ label: labels[d.getDay()], prob });
-    }
-    return week;
-}
-
-function getColor(prob) {
-    if (prob >= 70) return '#ff6b6b';
-    if (prob >= 40) return '#ffd93d';
-    return '#6bcb77';
-}
-
-function getDescription(prob) {
-    if (prob >= 70) return '🔴 Высокая активность';
-    if (prob >= 40) return '🟡 Умеренная активность';
-    return '🟢 Низкая активность';
-}
-
-function getPredictionText(prob) {
-    if (prob >= 80) return 'Вероятны боевые приказы';
-    if (prob >= 60) return 'Вероятны техпроверки';
-    if (prob >= 40) return 'Обычный эфир';
-    return 'Спокойный эфир';
-}
-
-function getWeekSummary(week) {
-    const high = week.filter(d => d.prob >= 70).length;
-    if (high >= 3) return `🔥 ${high} дней высокой активности`;
-    if (high >= 1) return `⚡ ${high} день с высокой активностью`;
-    return '🌊 Спокойная неделя';
-}
-
-// ----- КАРТА (с анимацией) -----
-function renderMap() {
-    if (state.map) {
-        state.map.remove();
-        state.markers = [];
-        state.routes = [];
-    }
-
-    state.map = L.map('map', {
-        center: [55.0, 40.0],
-        zoom: 4,
-        zoomControl: true,
-        fadeAnimation: true,
-        attributionControl: true
-    });
-
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, &copy; CartoDB'
-    }).addTo(state.map);
-
-    // Собираем точки с координатами
-    const points = [];
-    state.messages.forEach(msg => {
-        const digits = [msg.digits_1, msg.digits_2, msg.digits_3, msg.digits_4]
-            .filter(d => d && d.trim())
-            .join(' ');
-
-        const decoded = decodeCoordinates(digits);
-        if (decoded) {
-            const { lat, lon } = decoded.shifted;
-            if (!isNaN(lat) && !isNaN(lon) && lat > -90 && lat < 90 && lon > -180 && lon < 180) {
-                points.push({ lat, lon, msg });
-            }
-        }
-    });
-
-    // Сортируем по времени
-    points.sort((a, b) => {
-        const da = a.msg.date || '0000-00-00';
-        const db = b.msg.date || '0000-00-00';
-        return da.localeCompare(db) || (a.msg.time || '00:00').localeCompare(b.msg.time || '00:00');
-    });
-
-    // Рисуем точки
-    points.forEach((p, index) => {
-        const color = getPointColor(p.msg);
-        const marker = L.circleMarker([p.lat, p.lon], {
-            radius: 8,
-            fillColor: color,
-            color: color,
-            weight: 2,
-            opacity: 0.8,
-            fillOpacity: 0.7
-        }).addTo(state.map);
-
-        const translation = translateMessage(p.msg);
-        const popupText = `
-            <b>${p.msg.callsign || '???'}</b><br>
-            ${p.msg.date || ''} ${p.msg.time || ''}<br>
-            ${translation}<br>
-            <span style="color:#58a6ff;">${p.lat.toFixed(2)}°N, ${p.lon.toFixed(2)}°E</span>
-            <br><span style="color:#5a6a7a;font-size:0.75rem;">📍 После сдвига +2°/+5°</span>
-        `;
-        marker.bindPopup(popupText);
-
-        state.markers.push({ lat: p.lat, lon: p.lon, marker, msg: p.msg });
-
-        // Рисуем маршруты (соединяем точки по времени)
-        if (index > 0 && index < points.length) {
-            const prev = points[index - 1];
-            const route = L.polyline(
-                [[prev.lat, prev.lon], [p.lat, p.lon]],
-                { color: '#58a6ff', weight: 1.5, opacity: 0.3, dashArray: '5, 10' }
-            ).addTo(state.map);
-            state.routes.push(route);
-        }
-    });
-
-    // Добавляем зоны активности
-    if (points.length > 0) {
-        const center = getCenter(points);
-        const zone = L.circle([center.lat, center.lon], {
-            radius: 300000,
-            color: '#58a6ff',
-            weight: 1,
-            opacity: 0.15,
-            fillColor: '#58a6ff',
-            fillOpacity: 0.05
-        }).addTo(state.map);
-        state.routes.push(zone);
-    }
-
-    // Если нет точек — тестовые
-    if (points.length === 0) {
-        c
+                        <div style="flex:1
